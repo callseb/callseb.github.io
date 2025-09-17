@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 100 100">
+  <!-- FLW-ish stained glass motif: rectangles + lines -->
+  <rect width="100" height="100" fill="none"/>
+  <g stroke="#c46a2d" stroke-width="0.5" fill="none" opacity="0.8">
+    <rect x="5" y="5" width="90" height="90"/>
+    <rect x="10" y="10" width="30" height="30"/>
+    <rect x="50" y="10" width="40" height="20"/>
+    <rect x="10" y="50" width="25" height="40"/>
+    <rect x="40" y="50" width="50" height="40"/>
+    <path d="M10 10 L40 40 M50 10 L90 30 M10 50 L35 90 M40 50 L90 90"/>
+  </g>
+  <g fill="#2b3a2e" opacity="0.3"><rect x="50" y="10" width="20" height="20"/></g>
+  <g fill="#6b4f2c" opacity="0.3"><rect x="10" y="50" width="12" height="20"/></g>
+  <g fill="#9c7b4f" opacity="0.3"><rect x="70" y="60" width="20" height="28"/></g>
+</svg>
