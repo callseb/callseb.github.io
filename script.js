@@ -1,10 +1,11 @@
-// Set up the 3D scene
+import * as THREE from 'https://cdn.skypack.dev/three@0.132.2';
+import { gsap } from 'https://cdn.skypack.dev/gsap@3.9.1';
+
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene') });
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-// Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
@@ -12,7 +13,6 @@ const pointLight = new THREE.PointLight(0xffffff, 1, 100);
 pointLight.position.set(0, 3, 5);
 scene.add(pointLight);
 
-// UFO and Alien Models (Simple Shapes for now)
 const ufoGeometry = new THREE.SphereGeometry(1, 32, 32);
 const ufoMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
 const ufo = new THREE.Mesh(ufoGeometry, ufoMaterial);
@@ -25,7 +25,6 @@ const alien = new THREE.Mesh(alienGeometry, alienMaterial);
 alien.position.set(0, 0.5, -5);
 scene.add(alien);
 
-// Animation Loop
 function animate() {
   requestAnimationFrame(animate);
   ufo.rotation.x += 0.01;
@@ -37,7 +36,6 @@ function animate() {
 
 animate();
 
-// UFO Click Event - Zoom Out & Transition to Solar System
 document.getElementById('ufo').addEventListener('click', () => {
   gsap.to('.alien-container', {
     scale: 0.5,
@@ -50,16 +48,13 @@ document.getElementById('ufo').addEventListener('click', () => {
   });
 });
 
-// Planet Click Event - Open Content
 document.querySelectorAll('.planet').forEach((planet) => {
   planet.addEventListener('click', () => {
     const planetName = planet.id;
     alert(`Welcome to ${planetName}!`);
-    // You can add different content here for each planet (About, Stories, etc.)
   });
 });
 
-// Window Resize Handling
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
