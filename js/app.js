@@ -39,3 +39,24 @@ document.querySelectorAll('.card').forEach((card) => {
     card.style.transform = '';
   });
 });
+document.getElementById('ufo').addEventListener('click', () => {
+  // UFO click animation (zooming out)
+  gsap.to('.alien-container', {
+    scale: 0.5,
+    opacity: 0,
+    duration: 1,
+    onComplete: () => {
+      document.getElementById('solar-system').classList.remove('hidden');
+      gsap.to('#solar-system', { top: '20%', duration: 2 });
+    }
+  });
+});
+
+// Planet Click Animation (showing detailed content)
+document.querySelectorAll('.planet').forEach((planet) => {
+  planet.addEventListener('click', () => {
+    const planetName = planet.id;
+    alert(`Welcome to ${planetName}!`);
+    // You can add different content here for each planet (About, Stories, etc.)
+  });
+});
