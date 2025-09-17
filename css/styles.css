@@ -2,13 +2,19 @@ body {
   background-color: #000;
   color: white;
   font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
-.alien-container {
+#scene-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
 }
 
 .ufo {
@@ -61,66 +67,32 @@ body {
 .hidden {
   display: none;
 }
-body {
+
+/* 3D Effect and Psychedelic Vibes */
+#scene {
+  position: absolute;
+  width: 100%;
+  height: 100%;
   background-color: #000;
-  color: white;
-  font-family: Arial, sans-serif;
 }
 
-.alien-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+/* Simple Planet Hover Effects */
+#earth:hover {
+  background-color: #77e3ff;
 }
 
-.ufo {
-  position: relative;
-  width: 200px;
-  height: 100px;
-  background: radial-gradient(circle, #00ff00, #004d00);
-  border-radius: 50%;
-  box-shadow: 0 0 40px rgba(0, 255, 0, 0.5);
-  cursor: pointer;
+#mars:hover {
+  background-color: #ff9b6a;
 }
 
-.alien {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  width: 50px;
-  height: 50px;
-  background-color: green;
-  border-radius: 50%;
-  transform: translateX(-50%);
+#venus:hover {
+  background-color: #ffd1e6;
 }
 
-#solar-system {
-  display: flex;
-  justify-content: space-around;
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  transition: transform 2s ease-in-out;
+#jupiter:hover {
+  background-color: #c9d4ff;
 }
 
-.planet {
-  width: 60px;
-  height: 60px;
-  background-color: #ff0;
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.planet:hover {
-  transform: scale(1.1);
-}
-
-.hidden {
-  display: none;
+#saturn:hover {
+  background-color: #d1ffe7;
 }
