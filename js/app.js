@@ -1,46 +1,44 @@
-// year
-document.getElementById('year').textContent = new Date().getFullYear();
+// Set up the 3D scene
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene') });
+renderer.setSize(window.innerWidth, window.innerHeight);
 
-// Intro motion
-window.addEventListener('load', () => {
-  const cells = document.querySelectorAll('.cell');
-  gsap.set(cells, { opacity: 0, y: 20, scale: 0.98 });
-  gsap.to(cells, {
-    opacity: 1, y: 0, scale: 1,
-    stagger: { each: 0.04, from: 'random' },
-    duration: 0.6, ease: 'power2.out', delay: 0.2
-  });
+// Lighting
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+scene.add(ambientLight);
 
-  // Hero text rise
-  gsap.from('.hero__content > *', {
-    y: 20, opacity: 0, duration: 0.6, stagger: 0.1, ease: 'power2.out'
-  });
-});
+const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+pointLight.position.set(0, 3, 5);
+scene.add(pointLight);
 
-// Scroll reveals
-gsap.registerPlugin(ScrollTrigger);
-gsap.utils.toArray('.section').forEach((sec) => {
-  gsap.from(sec.querySelectorAll('h2, p, .cards, .contact'), {
-    opacity: 0, y: 24, duration: 0.6, ease: 'power2.out',
-    scrollTrigger: { trigger: sec, start: 'top 75%' }
-  });
-});
+// UFO and Alien Models (Simple Shapes for now)
+const ufoGeometry = new THREE.SphereGeometry(1, 32, 32);
+const ufoMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+const ufo = new THREE.Mesh(ufoGeometry, ufoMaterial);
+ufo.position.set(0, 0, -5);
+scene.add(ufo);
 
-// Micro-interaction: card tilt
-document.querySelectorAll('.card').forEach((card) => {
-  card.addEventListener('mousemove', (e) => {
-    const r = card.getBoundingClientRect();
-    const x = e.clientX - r.left, y = e.clientY - r.top;
-    const rx = ((y / r.height) - 0.5) * -4;
-    const ry = ((x / r.width) - 0.5) * 4;
-    card.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateY(-4px)`;
-  });
-  card.addEventListener('mouseleave', () => {
-    card.style.transform = '';
-  });
-});
+const alienGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+const alienMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+const alien = new THREE.Mesh(alienGeometry, alienMaterial);
+alien.position.set(0, 0.5, -5);
+scene.add(alien);
+
+// Animation Loop
+function animate() {
+  requestAnimationFrame(animate);
+  ufo.rotation.x += 0.01;
+  ufo.rotation.y += 0.01;
+  alien.rotation.x += 0.01;
+  alien.rotation.y += 0.01;
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// UFO Click Event - Zoom Out & Transition to Solar System
 document.getElementById('ufo').addEventListener('click', () => {
-  // UFO click animation (zooming out)
   gsap.to('.alien-container', {
     scale: 0.5,
     opacity: 0,
@@ -52,11 +50,18 @@ document.getElementById('ufo').addEventListener('click', () => {
   });
 });
 
-// Planet Click Animation (showing detailed content)
+// Planet Click Event - Open Content
 document.querySelectorAll('.planet').forEach((planet) => {
   planet.addEventListener('click', () => {
     const planetName = planet.id;
     alert(`Welcome to ${planetName}!`);
     // You can add different content here for each planet (About, Stories, etc.)
   });
+});
+
+// Window Resize Handling
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
