@@ -1,13 +1,13 @@
 /*
- * planetScript.js — stable & bright edition
- * Textured planets + curved labels + click-through.
+ * planetScript.js — Far-star field + scroll-to-zoom tour + textured planets
  * Requires Three.js + GSAP. Exposes window.initSolarSystem().
  */
 
 (function () {
   const TEX = "https://threejs.org/examples/textures/planets";
+  const STAR_SPRITE = "https://threejs.org/examples/textures/sprites/disc.png";
 
-  // Find or create a canvas so we always render somewhere
+  // ---------- utilities ----------
   function getOrCreateCanvas() {
     let canvas =
       document.getElementById("solar-scene") ||
@@ -27,7 +27,7 @@
     return canvas;
   }
 
-  // ---- curved label (canvas → sprite) ----
+  // Curved label
   function makeCurvedLabel(text, diameterPx = 180) {
     const pad = 24, size = diameterPx + pad * 2;
     const cvs = document.createElement("canvas");
@@ -64,28 +64,42 @@
     const mat = new THREE.SpriteMaterial({
       map: tex, transparent: true, depthWrite: false, opacity: 0
     });
-    const sprite = new THREE.Sprite(mat);
-    return sprite;
+    return new THREE.Sprite(mat);
   }
 
-  // ---- stars ----
-  function makeStars(count) {
+  // Far-away star shell (no close stars)
+  function makeStars({ count = 3000, rMin = 800, rMax = 1600 } = {}) {
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
+
+    // distribute on a thick spherical shell far from origin
     for (let i = 0; i < count; i++) {
-      const r = THREE.MathUtils.randFloat(140, 520);
-      const theta = Math.random() * Math.PI * 2;
-      const y = THREE.MathUtils.randFloatSpread(220);
-      positions[i * 3] = Math.cos(theta) * r;
-      positions[i * 3 + 1] = y;
-      positions[i * 3 + 2] = Math.sin(theta) * r;
+      const r = THREE.MathUtils.randFloat(rMin, rMax);
+      const theta = Math.acos(THREE.MathUtils.randFloatSpread(2)); // [0,pi]
+      const phi = Math.random() * Math.PI * 2;                      // [0,2pi]
+      positions[i * 3]     = r * Math.sin(theta) * Math.cos(phi);
+      positions[i * 3 + 1] = r * Math.cos(theta);
+      positions[i * 3 + 2] = r * Math.sin(theta) * Math.sin(phi);
     }
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const mat = new THREE.PointsMaterial({ size: 0.8, sizeAttenuation: true, color: 0xffffff, opacity: 0.95, transparent: true });
+
+    // round sprite so stars are not squares
+    const tex = new THREE.TextureLoader().load(STAR_SPRITE);
+    const mat = new THREE.PointsMaterial({
+      map: tex,
+      size: 2.0,
+      sizeAttenuation: true,
+      color: 0xffffff,
+      transparent: true,
+      alphaTest: 0.5,
+      opacity: 0.9,
+      depthWrite: false,
+    });
+
     return new THREE.Points(geo, mat);
   }
 
-  // ---- safe material loader with color fallback ----
+  // safer planet material (falls back to color if texture fails)
   function makePlanetMaterial(url, fallbackColor = 0x888888) {
     const loader = new THREE.TextureLoader();
     const mat = new THREE.MeshStandardMaterial({ color: fallbackColor, roughness: 1, metalness: 0 });
@@ -93,7 +107,7 @@
       url,
       (tx) => { mat.map = tx; mat.needsUpdate = true; },
       undefined,
-      () => { /* texture failed; keep color fallback */ }
+      () => { /* keep color */ }
     );
     return mat;
   }
@@ -108,42 +122,44 @@
 
     // scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);     // solid black
-    // scene.fog = new THREE.FogExp2(0x070a14, 0.010); // <- disabled to avoid hiding far planets
-    scene.add(makeStars(2600));
+    scene.background = new THREE.Color(0x000000);
+    scene.add(makeStars()); // far shell
 
-    // camera (closer + friendly)
-    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 5000);
-    camera.position.set(0, 70, 260);
+    // camera
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 6000);
+    camera.position.set(0, 75, 280);
 
-    // lights (brighter so textures pop even if point light misses)
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    const sunLight = new THREE.PointLight(0xffffff, 2.0, 0, 2);
+    // lights
+    const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+    const sunLight = new THREE.PointLight(0xffffff, 2.2, 0, 2);
     sunLight.position.set(0, 0, 0);
     scene.add(ambient, sunLight);
 
-    // SUN
+    // SUN (basic)
     const sun = new THREE.Mesh(
       new THREE.SphereGeometry(14, 64, 64),
-      new THREE.MeshBasicMaterial({ color: 0xffcc55 }) // also add a texture if you want
+      new THREE.MeshBasicMaterial({ color: 0xffcc55 })
     );
+    sun.name = "Sun";
     scene.add(sun);
 
-    // planets config — edit URLs/labels to your pages
+    // planets config — map URLs to your pages
     const PLANETS = [
-      { name: "Mercury", tex: `${TEX}/mercury.jpg`,              color: 0x9c9c9c, size: 2.2, orbit: 26,  speed: 0.020, url: "about.html",        label: "About" },
-      { name: "Venus",   tex: `${TEX}/venus.jpg`,                color: 0xd8b57a, size: 3.5, orbit: 36,  speed: 0.016, url: "writing.html",      label: "Writing" },
-      { name: "Earth",   tex: `${TEX}/earth_atmos_2048.jpg`,     color: 0x5aa0ff, size: 3.7, orbit: 48,  speed: 0.014, url: "projects.html",     label: "Projects" },
-      { name: "Mars",    tex: `${TEX}/mars_1k_color.jpg`,        color: 0xb55a3c, size: 3.0, orbit: 60,  speed: 0.012, url: "photography.html",  label: "Photos" },
-      { name: "Jupiter", tex: `${TEX}/jupiter2_1024.jpg`,        color: 0xe0c7a2, size: 8.5, orbit: 84,  speed: 0.009, url: "resume.html",       label: "Resume" },
-      { name: "Saturn",  tex: `${TEX}/saturn.jpg`,               color: 0xdcc7a0, size: 7.5, orbit: 106, speed: 0.008, url: "contact.html",      label: "Contact" },
-      { name: "Uranus",  tex: `${TEX}/uranus.jpg`,               color: 0x88e0e8, size: 6.0, orbit: 126, speed: 0.007, url: "links.html",        label: "Links" },
-      { name: "Neptune", tex: `${TEX}/neptune.jpg`,              color: 0x4a6eff, size: 5.8, orbit: 144, speed: 0.006, url: "blog.html",         label: "Blog" },
+      { name: "Mercury", tex: `${TEX}/mercury.jpg`,              color: 0x9c9c9c, size: 2.2, orbit: 28,  speed: 0.020, url: "about.html",        label: "About" },
+      { name: "Venus",   tex: `${TEX}/venus.jpg`,                color: 0xd8b57a, size: 3.5, orbit: 38,  speed: 0.016, url: "writing.html",      label: "Writing" },
+      { name: "Earth",   tex: `${TEX}/earth_atmos_2048.jpg`,     color: 0x5aa0ff, size: 3.7, orbit: 50,  speed: 0.014, url: "projects.html",     label: "Projects" },
+      { name: "Mars",    tex: `${TEX}/mars_1k_color.jpg`,        color: 0xb55a3c, size: 3.0, orbit: 62,  speed: 0.012, url: "photography.html",  label: "Photos" },
+      { name: "Jupiter", tex: `${TEX}/jupiter2_1024.jpg`,        color: 0xe0c7a2, size: 8.5, orbit: 88,  speed: 0.009, url: "resume.html",       label: "Resume" },
+      { name: "Saturn",  tex: `${TEX}/saturn.jpg`,               color: 0xdcc7a0, size: 7.5, orbit: 112, speed: 0.008, url: "contact.html",      label: "Contact" },
+      { name: "Uranus",  tex: `${TEX}/uranus.jpg`,               color: 0x88e0e8, size: 6.0, orbit: 132, speed: 0.007, url: "links.html",        label: "Links" },
+      { name: "Neptune", tex: `${TEX}/neptune.jpg`,              color: 0x4a6eff, size: 5.8, orbit: 150, speed: 0.006, url: "blog.html",         label: "Blog" },
     ];
 
+    const loader = new THREE.TextureLoader();
     const planets = [];
     const labels  = [];
 
+    // build planets
     PLANETS.forEach((cfg, i) => {
       const mat = makePlanetMaterial(cfg.tex, cfg.color);
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(cfg.size, 64, 64), mat);
@@ -156,7 +172,7 @@
       scene.add(mesh);
       planets.push(mesh);
 
-      // curved label
+      // label
       const sprite = makeCurvedLabel(`${cfg.name} • ${cfg.label}`, 200);
       sprite.scale.set(18, 9, 1);
       sprite.position.copy(mesh.position).add(new THREE.Vector3(0, cfg.size + 6, 0));
@@ -165,12 +181,10 @@
 
       // saturn ring
       if (cfg.name === "Saturn") {
-        const loader = new THREE.TextureLoader();
         const ring = new THREE.Mesh(
           new THREE.RingGeometry(cfg.size * 1.2, cfg.size * 2.2, 96),
           new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, color: 0xffffff })
         );
-        // try to apply textures but don't fail if blocked
         loader.load(`${TEX}/saturnringcolor.jpg`, (t) => { ring.material.map = t; ring.material.needsUpdate = true; });
         loader.load(`${TEX}/saturnringpattern.gif`, (t) => { ring.material.alphaMap = t; ring.material.needsUpdate = true; });
         ring.rotation.x = -Math.PI / 2;
@@ -180,9 +194,7 @@
       }
     });
 
-    console.log(`Built planets: ${planets.length}`);
-
-    // interactions
+    // ---------- interactions ----------
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let hovered = null;
@@ -226,15 +238,62 @@
         document.body.style.cursor = "default";
       }
     }
+    window.addEventListener("pointermove", onPointerMove);
 
+    // click-through
     function onClick() {
       if (!hovered) return;
       const url = hovered.userData.url;
       if (url) window.location.href = url;
     }
-
-    window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("click", onClick);
+
+    // ---------- SCROLL-TO-ZOOM TOUR ----------
+    // Targets: Sun + planets
+    const focusTargets = [sun, ...planets];
+    let focusIndex = 0;
+    const lookAtTarget = new THREE.Vector3(0, 0, 0);
+
+    function focusOn(index) {
+      focusIndex = THREE.MathUtils.clamp(index, 0, focusTargets.length - 1);
+      const obj = focusTargets[focusIndex];
+
+      // distance from target based on object size
+      const radius = obj.geometry && obj.geometry.parameters && obj.geometry.parameters.radius
+        ? obj.geometry.parameters.radius
+        : 10;
+
+      // camera offset relative to target (slightly above + back)
+      const targetPos = obj.position.clone();
+      const offset = new THREE.Vector3(0, radius * 2.2, radius * 6.0);
+      const dest = targetPos.clone().add(offset);
+
+      gsap.to(camera.position, {
+        x: dest.x, y: dest.y, z: dest.z,
+        duration: 0.9, ease: "power2.out"
+      });
+      gsap.to(lookAtTarget, {
+        x: targetPos.x, y: targetPos.y, z: targetPos.z,
+        duration: 0.9, ease: "power2.out"
+      });
+    }
+
+    // wheel advances / reverses focus: Sun → Mercury → … → Neptune
+    function onWheel(e) {
+      e.preventDefault();
+      const dir = e.deltaY > 0 ? 1 : -1;
+      focusOn(focusIndex + dir);
+    }
+    window.addEventListener("wheel", onWheel, { passive: false });
+
+    // also allow left/right arrow keys
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") focusOn(focusIndex + 1);
+      if (e.key === "ArrowLeft")  focusOn(focusIndex - 1);
+    });
+
+    // start focused on the Sun
+    focusOn(0);
 
     // resize
     window.addEventListener("resize", () => {
@@ -243,10 +302,7 @@
       camera.updateProjectionMatrix();
     });
 
-    // intro glide + slow auto-orbit so you see everything
-    gsap.fromTo(camera.position, { z: 360, y: 50 }, { z: 260, y: 70, duration: 1.4, ease: "power2.out" });
-
-    let autoAngle = 0;
+    // animate
     (function animate() {
       requestAnimationFrame(animate);
 
@@ -256,6 +312,7 @@
         const r = p.userData.orbit;
         p.position.set(Math.cos(p.userData.angle) * r, 0, Math.sin(p.userData.angle) * r);
         p.rotation.y += p.userData.baseRot;
+
         if (p.userData.ring) p.userData.ring.position.copy(p.position);
 
         const label = labels[i];
@@ -265,12 +322,7 @@
         }
       });
 
-      // very slow auto camera orbit (helps discoverability)
-      autoAngle += 0.0008;
-      camera.position.x = Math.cos(autoAngle) * 260;
-      camera.position.z = Math.sin(autoAngle) * 260;
-      camera.lookAt(0, 0, 0);
-
+      camera.lookAt(lookAtTarget);
       renderer.render(scene, camera);
     })();
   };
