@@ -156,3 +156,9 @@ iconContainer.addEventListener('click', () => {
     }
   }});
 });
+const ufoTexture = new THREE.TextureLoader().load('assets/ufo-icon.png');
+const ufoMaterial = new THREE.SpriteMaterial({ map: ufoTexture, color: 0xffffff });
+const ufo = new THREE.Sprite(ufoMaterial);
+ufo.scale.set(5, 5, 1); // bigger and visible
+ufo.position.set(0, 5, 0);
+scene.add(ufo);
