@@ -1,63 +1,19 @@
-window.addEventListener('DOMContentLoaded', () => {
-  const sceneContainer = document.getElementById('scene-container');
-  const universeCanvas = document.getElementById('universe');
+// Handles the landing → scene handoff and guards init
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("ufo-btn");
+  const intro = document.getElementById("intro");
+  const hint = document.getElementById("hint");
 
-  // THREE.js scene
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(
-    75,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-  );
-  camera.position.z = 20;
+  if (!btn) return;
 
-  const renderer = new THREE.WebGLRenderer({ canvas: universeCanvas, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
-  // Star field
-  const starsGeometry = new THREE.BufferGeometry();
-  const starsCount = 10000;
-  const starsPositions = new Float32Array(starsCount * 3);
-  for (let i = 0; i < starsCount * 3; i++) {
-    starsPositions[i] = (Math.random() - 0.5) * 500;
-  }
-  starsGeometry.setAttribute('position', new THREE.BufferAttribute(starsPositions, 3));
-  const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2 });
-  const stars = new THREE.Points(starsGeometry, starsMaterial);
-  scene.add(stars);
-
-  // UFO sprite
-  const ufoTexture = new THREE.TextureLoader().load('assets/ufo-icon.png');
-  const ufoMaterial = new THREE.SpriteMaterial({ map: ufoTexture, color: 0xffffff });
-  const ufo = new THREE.Sprite(ufoMaterial);
-  ufo.scale.set(5, 5, 1); // larger
-  ufo.position.set(0, 5, 0);
-  scene.add(ufo);
-
-  // UFO hover animation
-  gsap.to(ufo.position, {
-    y: '+=1',
-    duration: 1.5,
-    repeat: -1,
-    yoyo: true,
-    ease: 'sine.inOut',
+  btn.addEventListener("click", () => {
+    // fade overlay away
+    if (intro) {
+      gsap.to(intro, { autoAlpha: 0, duration: 0.6, onComplete: () => intro.style.display = "none" });
+    }
+    // init the solar system
+    if (window.initSolarSystem) window.initSolarSystem();
+    // reveal hint after a moment
+    gsap.to(hint, { opacity: 1, delay: 1.2, duration: .6 });
   });
-
-  // Animate stars
-  function animate() {
-    requestAnimationFrame(animate);
-    stars.rotation.y += 0.0005;
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  // Window resize
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-
-  // UFO click -> show solar system
-  const iconContainer =
+});
