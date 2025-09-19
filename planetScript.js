@@ -143,4 +143,103 @@
         const ringTex = loader.load(`${TEX}/saturnringcolor.jpg`);
         const ringAlpha = loader.load(`${TEX}/saturnringpattern.gif`);
         const ring = new THREE.Mesh(
-          new THREE.RingGeometry(cfg.size
+          new THREE.RingGeometry(cfg.size * 1.2, cfg.size * 2.2, 96),
+          new THREE.MeshBasicMaterial({ map: ringTex, alphaMap: ringAlpha, side: THREE.DoubleSide, transparent: true })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.copy(mesh.position);
+        scene.add(ring);
+        mesh.userData.ring = ring;
+      }
+    });
+
+    // interactions
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hovered = null;
+
+    function setLabelVisible(sprite, visible) {
+      const target = visible ? 1 : 0;
+      if (sprite.material.opacity === target) return;
+      gsap.to(sprite.material, { opacity: target, duration: 0.25, ease: "power2.out" });
+      if (visible) {
+        gsap.fromTo(sprite.scale,
+          { x: sprite.scale.x * 0.92, y: sprite.scale.y * 0.92, z: 1 },
+          { x: sprite.scale.x,        y: sprite.scale.y,        z: 1, duration: 0.25, ease: "power2.out" }
+        );
+      }
+    }
+
+    function onPointerMove(e) {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(planets, false);
+
+      if (hits.length) {
+        const obj = hits[0].object;
+        if (hovered !== obj) {
+          if (hovered) {
+            setLabelVisible(labels[planets.indexOf(hovered)], false);
+            gsap.to(hovered.scale, { x: 1, y: 1, z: 1, duration: 0.15 });
+          }
+          hovered = obj;
+          setLabelVisible(labels[planets.indexOf(obj)], true);
+          gsap.to(obj.scale, { x: 1.06, y: 1.06, z: 1.06, duration: 0.15 });
+          document.body.style.cursor = "pointer";
+        }
+      } else {
+        if (hovered) {
+          setLabelVisible(labels[planets.indexOf(hovered)], false);
+          gsap.to(hovered.scale, { x: 1, y: 1, z: 1, duration: 0.15 });
+        }
+        hovered = null;
+        document.body.style.cursor = "default";
+      }
+    }
+
+    function onClick() {
+      if (!hovered) return;
+      const url = hovered.userData.url;
+      if (url) window.location.href = url;
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("click", onClick);
+
+    // resize
+    function onResize() {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener("resize", onResize);
+
+    // intro camera glide
+    gsap.fromTo(camera.position, { z: 460, y: 30 }, { z: 320, y: 80, duration: 1.8, ease: "power2.out" });
+
+    // animate
+    function animate() {
+      requestAnimationFrame(animate);
+
+      planets.forEach((p, i) => {
+        p.userData.angle += p.userData.speed;
+        const r = p.userData.orbit;
+        p.position.set(Math.cos(p.userData.angle) * r, 0, Math.sin(p.userData.angle) * r);
+        p.rotation.y += p.userData.baseRot;
+
+        if (p.userData.ring) p.userData.ring.position.copy(p.position);
+
+        const label = labels[i];
+        if (label) {
+          label.position.set(p.position.x, p.position.y + (p.geometry.parameters.radius || 1) + 6, p.position.z);
+          label.lookAt(camera.position);
+        }
+      });
+
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+    }
+    animate();
+  };
+})();
