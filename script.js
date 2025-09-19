@@ -145,3 +145,14 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+const iconContainer = document.getElementById('icon-container');
+iconContainer.addEventListener('click', () => {
+  gsap.to('#intro-overlay', {duration: 1, opacity: 0, ease: 'power2.inOut'});
+  gsap.to('#icon-container', {duration: 1, scale: 0.5, opacity: 0, ease: 'power2.inOut', onComplete: () => {
+    const solarContainer = document.getElementById('solar-container');
+    solarContainer.classList.remove('hidden');
+    if(typeof window.initSolarSystem === 'function'){
+      window.initSolarSystem();
+    }
+  }});
+});
