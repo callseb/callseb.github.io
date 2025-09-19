@@ -1,59 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sebastian Callahan</title>
-  <!-- Link to the shared stylesheet -->
-  <link rel="stylesheet" href="styles.css">
-  <!-- Include Three.js and GSAP from a CDN.  These libraries power the 3D
-       star field and animation effects on the landing page.  Using
-       deferred loading ensures the scripts load after the HTML has
-       parsed. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
-  <!-- Your custom logic for the landing page.  This script creates the
-       interactive star field and handles the transition into the
-       planetary experience. -->
-  <script src="script.js" defer></script>
-  <!-- Load the solar system module.  It defines `initSolarSystem()`
-       which the landing script calls when the user enters the
-       planetary view. -->
-  <script src="planetScript.js" defer></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cosmic Journey — Sebastian Callahan</title>
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Three.js + GSAP -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <!-- App scripts -->
+  <script defer src="planetScript.js"></script>
+  <script defer src="script.js"></script>
 </head>
 <body>
-  <!-- The entire scene is wrapped in a container so it can fill the
-       viewport.  The canvas element will be populated by Three.js with
-       a dynamic star field. -->
-  <div id="scene-container">
-    <canvas id="universe"></canvas>
-    <!-- Overlay containing an interactive icon.  Replace the `src` of
-         the image with your own file (e.g. a cute alien or UFO).  The
-         caption is optional and can be styled however you like. -->
-    <div id="icon-container">
-      <img src="assets/ufo-icon.png" id="ufo-icon" alt="Begin your journey">
-      <div class="caption">Begin your journey</div>
-    </div>
-    <!-- Intro panel.  This overlay introduces the experience and can
-         include any welcome text you wish.  You can remove or edit
-         these elements to suit your project. -->
-    <div id="intro-overlay" class="intro">
+
+  <!-- Landing / intro overlay -->
+  <section id="intro" class="overlay">
+    <div class="intro-inner">
       <h1>Welcome</h1>
-      <p>Click the UFO to start.</p>
+      <p>Begin your journey</p>
+      <p class="sub">Click the UFO to start.</p>
+
+      <!-- Visible, clickable UFO -->
+      <button id="ufo-btn" aria-label="Enter">
+        <img src="assets/ufo-icon.png" alt="UFO" />
+      </button>
     </div>
-    <!-- Solar system container.  This section remains hidden until
-         the user clicks the icon.  When revealed, a new Three.js
-         renderer will populate the canvas with orbiting planets.  The
-         info panel displays details when a planet is selected. -->
-    <div id="solar-container" class="hidden">
-      <canvas id="solar-scene"></canvas>
-      <div id="info-panel" class="hidden">
-        <button id="close-info">×</button>
-        <h2 id="planet-title"></h2>
-        <p id="planet-content"></p>
-        <div class="icon-slot"></div>
-      </div>
-    </div>
-  </div>
+  </section>
+
+  <!-- 3D scene -->
+  <canvas id="solar-scene"></canvas>
+
+  <!-- Hover hint (optional) -->
+  <div id="hint">hover a planet • click to open</div>
+
+  <noscript>
+    <style>body{font-family:system-ui;padding:2rem}</style>
+    <p>This site needs JavaScript enabled to render the 3D universe.</p>
+  </noscript>
 </body>
 </html>
