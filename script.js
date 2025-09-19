@@ -162,3 +162,9 @@ const ufo = new THREE.Sprite(ufoMaterial);
 ufo.scale.set(5, 5, 1); // bigger and visible
 ufo.position.set(0, 5, 0);
 scene.add(ufo);
+const labelDiv = document.createElement('div');
+labelDiv.className = 'label';
+labelDiv.innerHTML = '<p>Earth: About 70% water...</p>';
+const label = new THREE.CSS2DObject(labelDiv);
+label.position.set(0, planetRadius + 1, 0);
+planet.add(label);
