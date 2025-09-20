@@ -241,4 +241,81 @@
     onResize(renderer, camera);
 
     // Prefer user's Crazy-4 wormhole if present
-    let usedCrazy4
+    let usedCrazy4 = false;
+    try {
+      const mod = await import('./crazy4-wormhole.js'); // << drop-in from your zip if you have it
+      if (mod && typeof mod.createWormhole === 'function') {
+        mod.createWormhole(scene, camera, renderer);
+        usedCrazy4 = true;
+      }
+    } catch (e) { /* fallback to built-in below */ }
+
+    const layers = usedCrazy4 ? [] : addParallaxStars(scene);
+    const disc   = usedCrazy4 ? null : addAccretionDisc(scene);
+    const vortex = usedCrazy4 ? null : addVortex(scene);
+
+    // UFO + smoke
+    const ufo = buildUFO();
+    ufo.position.set(18, 9, 55);
+    scene.add(ufo);
+    const smoke = makeSmokeSystem(scene);
+
+    // Animate: curve into black hole center (0,0,0) and miniaturise
+    const target = new THREE.Vector3(0,0,0);
+    const pathMid = new THREE.Vector3(4, 2, 20);
+    const t0 = { k: 0 };
+    const dir = new THREE.Vector3();
+
+    gsap.to(t0, {
+      k: 1, duration: 2.4, ease: "power2.inOut",
+      onUpdate: ()=>{
+        // quadratic bezier
+        const k = t0.k, ik = 1-k;
+        const x = ik*ik*ufo.position.x + 2*ik*k*pathMid.x + k*k*target.x;
+        const y = ik*ik*ufo.position.y + 2*ik*k*pathMid.y + k*k*target.y;
+        const z = ik*ik*ufo.position.z + 2*ik*k*pathMid.z + k*k*target.z;
+
+        // direction for smoke
+        dir.set(x - ufo.position.x, y - ufo.position.y, z - ufo.position.z).normalize();
+        ufo.position.set(x,y,z);
+        ufo.lookAt(target);
+        ufo.rotation.y += 0.02;
+
+        // leave smoke
+        for(let i=0;i<3;i++) smoke.emit(ufo.position, dir);
+
+        // shrink as it approaches
+        const s = THREE.MathUtils.lerp(1, 0.08, k);
+        ufo.scale.set(s,s,s);
+      },
+      onComplete: ()=>{
+        // fade entry out, reveal solar scene, call onComplete
+        gsap.to(canvas, {
+          opacity: 0, duration: 0.6, ease: "power1.out",
+          onComplete: ()=>{
+            canvas.style.display = 'none';
+            const main = document.getElementById('solar-scene');
+            main.classList.remove('hidden');
+            document.getElementById('hint')?.classList.remove('hidden');
+            if (onComplete) onComplete();
+          }
+        });
+      }
+    });
+
+    // tick
+    let last = performance.now();
+    (function animate(){
+      requestAnimationFrame(animate);
+      const now = performance.now();
+      const dt = Math.min(0.05, (now-last)/1000); last = now;
+
+      // layers gentle rotation
+      for(const s of layers){ s.rotation.y += s.userData.rot; }
+      if (vortex && vortex.userData.update) vortex.userData.update(now*0.001*60);
+
+      smoke.update(dt);
+      renderer.render(scene, camera);
+    })();
+  };
+})();
