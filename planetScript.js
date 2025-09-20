@@ -1,49 +1,28 @@
 /*
- * planetScript.js — scroll-to-lock under cursor + closer lock + detailed planets
+ * planetScript.js — uses your StarsBackground, fixes Sun + Saturn rings,
+ * scroll-to-lock under cursor, close/readable lock card.
  * Three.js r128 + GSAP 3.12+
+ *
  * Exposes:
  *   window.initSolarSystem()
  *   window.startWelcomeSequence()
  */
-
 (function () {
   const TEX = "https://threejs.org/examples/textures/planets";
-  const STAR_SPRITE = "https://threejs.org/examples/textures/sprites/disc.png";
 
-  // ------------ helpers ------------
+  // ---------- helpers ----------
   function getOrCreateCanvas() {
     let canvas = document.getElementById("solar-scene") || document.getElementById("scene");
     if (!canvas) {
       canvas = document.createElement("canvas");
       canvas.id = "solar-scene";
-      Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100%", height: "100%", display: "block" });
+      Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100%", height: "100%", display: "block", zIndex: 10 });
       document.body.appendChild(canvas);
     }
     return canvas;
   }
 
-  // Stars: round sprites, closer & denser so they’re visible
-  function makeStars({ count = 5200, rMin = 750, rMax = 1350, size = 1.8 } = {}) {
-    const geo = new THREE.BufferGeometry();
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const r = THREE.MathUtils.randFloat(rMin, rMax);
-      const t = Math.acos(THREE.MathUtils.randFloatSpread(2));
-      const p = Math.random() * Math.PI * 2;
-      pos[i*3]   = r * Math.sin(t) * Math.cos(p);
-      pos[i*3+1] = r * Math.cos(t);
-      pos[i*3+2] = r * Math.sin(t) * Math.sin(p);
-    }
-    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    const sprite = new THREE.TextureLoader().load(STAR_SPRITE);
-    const mat = new THREE.PointsMaterial({
-      map: sprite, size, sizeAttenuation: true, color: 0xffffff,
-      transparent: true, alphaTest: 0.45, depthWrite: false, opacity: 0.95
-    });
-    return new THREE.Points(geo, mat);
-  }
-
-  // Curved sprite label (used for hover)
+  // curved sprite label (bigger, readable)
   function makeCurvedLabel(text, diameterPx = 260) {
     const pad = 28, size = diameterPx + pad * 2;
     const cvs = document.createElement("canvas");
@@ -51,6 +30,7 @@
     const ctx = cvs.getContext("2d");
     ctx.clearRect(0,0,size,size);
     ctx.translate(size/2, size/2);
+
     const radius = diameterPx/2;
     const chars = [...text];
     ctx.font = `700 28px Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`;
@@ -59,6 +39,7 @@
     ctx.shadowBlur = 14;
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
+
     const arc = Math.PI * 0.92;
     const step = arc / Math.max(chars.length, 1);
     let ang = -arc/2;
@@ -67,50 +48,74 @@
       ctx.fillText(ch, 0, 0); ctx.restore();
       ang += step;
     }
+
     const tex = new THREE.CanvasTexture(cvs);
     tex.anisotropy = 8;
     return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0 }));
   }
 
-  // Detailed planet material: tries normal/bump/spec maps if available (fails gracefully)
-  function makePlanetMaterial({ color=0x888888, map, normalMap, bumpMap, specularMap, bumpScale=0.2, metalness=0, roughness=1 }) {
+  // detailed materials with graceful fallbacks
+  function makePlanetMaterial(opts) {
+    const {
+      color=0x888888, map, normalMap, bumpMap, specularMap,
+      bumpScale=0.2, metalness=0, roughness=1
+    } = opts || {};
     const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
     const mat = new THREE.MeshStandardMaterial({ color, metalness, roughness });
 
     const set = (key, url, onload) => {
       if (!url) return;
-      loader.load(url, (tx) => { mat[key] = tx; if (onload) onload(tx); mat.needsUpdate = true; }, undefined, () => {/* ignore */});
+      loader.load(url, (tx) => {
+        // sRGB for color maps
+        if (key === "map") tx.encoding = THREE.sRGBEncoding;
+        mat[key] = tx;
+        if (onload) onload(tx);
+        mat.needsUpdate = true;
+      }, undefined, () => {/* ignore failures, keep fallback */});
     };
 
     set("map", map, (tx)=>{ tx.anisotropy = 8; });
     set("normalMap", normalMap);
     set("bumpMap", bumpMap, ()=>{ mat.bumpScale = bumpScale; });
-    set("roughnessMap", specularMap); // not perfect, but keeps highlights a bit tighter if provided
+    set("roughnessMap", specularMap);
 
     return mat;
   }
 
+  // detailed Sun with texture, emissive + halo (and a color fallback so it never looks black)
   function buildSun() {
     const g = new THREE.Group();
     const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+
     const sunMat = new THREE.MeshBasicMaterial({
-      map: loader.load(`${TEX}/sun.jpg`),
-      emissive: 0xffaa33, emissiveIntensity: 0.7
+      color: 0xffcc55, // fallback color so it’s never black
+      emissive: 0xffa733, emissiveIntensity: 0.7
     });
+
+    loader.load(`${TEX}/sun.jpg`, (tx) => {
+      tx.encoding = THREE.sRGBEncoding;
+      sunMat.map = tx;
+      sunMat.needsUpdate = true;
+    });
+
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(18, 96, 96), sunMat);
     g.add(sphere);
-    // halo
+
+    // soft halo
     const cvs = document.createElement("canvas"); cvs.width = cvs.height = 256;
     const c = cvs.getContext("2d"), grad = c.createRadialGradient(128,128,0,128,128,128);
     grad.addColorStop(0,"rgba(255,200,80,0.5)"); grad.addColorStop(1,"rgba(255,200,80,0.0)");
     c.fillStyle = grad; c.fillRect(0,0,256,256);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true, depthWrite: false }));
     glow.scale.set(90,90,1); g.add(glow);
+
     g.name = "Sun";
     return g;
   }
 
-  // ------------ module state ------------
+  // ---------- module state ----------
   let renderer, scene, camera;
   let planets = [], labels = [], sun;
   let raycaster, mouse, hovered = null;
@@ -122,23 +127,23 @@
   const screen = new THREE.Vector2();
 
   // HUD elements
-  const $hint = () => document.getElementById("hint");
-  const $skip = () => document.getElementById("tour-skip");
-  const $card = () => document.getElementById("lock-card");
+  const $skip  = () => document.getElementById("tour-skip");
+  const $card  = () => document.getElementById("lock-card");
   const $title = () => document.getElementById("lock-title");
-  const $sub = () => document.getElementById("lock-sub");
+  const $sub   = () => document.getElementById("lock-sub");
 
-  // ------------ API: init ------------
+  // ---------- API: init ----------
   window.initSolarSystem = function initSolarSystem() {
     const canvas = getOrCreateCanvas();
 
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    // IMPORTANT: alpha true so your React StarsBackground shows through
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-    scene.add(makeStars());
+    // Do NOT set scene.background — keep it transparent for your StarsBackground
 
     camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 8000);
     camera.position.set(0, 120, 420);
@@ -153,11 +158,11 @@
     sun = buildSun();
     scene.add(sun);
 
-    // PLANETS — with detail maps where likely available (if a map 404s, it just falls back)
+    // PLANETS (more detail; rings will be parented to Saturn)
     const P = [
       {
         name:"Mercury",  size:2.4, orbit: 48, speed:0.010, url:"about.html",       label:"About",
-        color:0x9c9c9c, map:`${TEX}/mercury.jpg`, normalMap:`${TEX}/mercury.jpg`, bumpMap:`${TEX}/mercury.jpg`, bumpScale:0.15
+        color:0x9c9c9c, map:`${TEX}/mercury.jpg`, bumpMap:`${TEX}/mercury.jpg`, bumpScale:0.15
       },
       {
         name:"Venus",    size:3.6, orbit: 66, speed:0.008, url:"writing.html",     label:"Writing",
@@ -202,6 +207,7 @@
     // planets + labels
     planets = []; labels = [];
     const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
 
     P.forEach((cfg, i) => {
       const mat = makePlanetMaterial({
@@ -209,7 +215,6 @@
         specularMap: cfg.specularMap, bumpScale: cfg.bumpScale ?? 0.2, metalness: 0, roughness: 1
       });
 
-      // more segments for crisper shading
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(cfg.size, 96, 96), mat);
       mesh.userData = {
         name: cfg.name, url: cfg.url, label: cfg.label,
@@ -221,22 +226,24 @@
       planets.push(mesh);
 
       const sprite = makeCurvedLabel(`${cfg.name} • ${cfg.label}`, 260);
-      sprite.scale.set(22, 11, 1);                // bigger labels
-      sprite.position.copy(mesh.position).add(new THREE.Vector3(0, cfg.size + 9, 0));
-      sprite.material.opacity = 0;                // show on hover or when locked
-      scene.add(sprite);
+      sprite.scale.set(22, 11, 1);
+      sprite.position.set(0, cfg.size + 9, 0); // will attach as child (so it follows while focused)
+      sprite.material.opacity = 0;
+      mesh.add(sprite);         // <— attach label to the planet itself
       labels.push(sprite);
 
+      // SATURN RINGS — parent to Saturn so they always stick
       if (cfg.ring) {
+        const inner = cfg.size*1.25, outer = cfg.size*2.25;
         const ring = new THREE.Mesh(
-          new THREE.RingGeometry(cfg.size*1.25, cfg.size*2.25, 96),
+          new THREE.RingGeometry(inner, outer, 96),
           new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, color: 0xffffff })
         );
+        ring.rotation.x = -Math.PI/2;
+        ring.position.set(0, 0, 0);
         loader.load(`${TEX}/saturnringcolor.jpg`, (t)=>{ ring.material.map=t; ring.material.needsUpdate=true; });
         loader.load(`${TEX}/saturnringpattern.gif`, (t)=>{ ring.material.alphaMap=t; ring.material.needsUpdate=true; });
-        ring.rotation.x = -Math.PI/2;
-        ring.position.copy(mesh.position);
-        scene.add(ring);
+        mesh.add(ring);         // <— parented to Saturn mesh
         mesh.userData.ring = ring;
       }
     });
@@ -246,18 +253,16 @@
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("click", onClick);
     window.addEventListener("resize", onResize);
-
-    // scroll to lock (under cursor)
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", (e)=>{ if(e.key==="ArrowRight") stepFocus(1); if(e.key==="ArrowLeft") stepFocus(-1); });
 
-    // focus list
-    focusTargets = [buildSunProxy(sun), ...planets]; // Sun first (proxy gives geometry.radius)
+    // focus list (Sun first, then planets)
+    focusTargets = [buildSunProxy(sun), ...planets];
 
     animate();
   };
 
-  // Tiny proxy so Sun has a "radius" like planets for distance math
+  // give Sun a "geometry.parameters.radius" like planets for distance math
   function buildSunProxy(sunGroup){
     const proxy = new THREE.Object3D();
     proxy.position.copy(sunGroup.position);
@@ -266,31 +271,33 @@
     return proxy;
   }
 
-  // ------------ welcome sequence ------------
+  // ---------- welcome sequence ----------
   window.startWelcomeSequence = function startWelcomeSequence() {
     camera.position.set(0, 140, 520);
     camera.lookAt(0,0,0);
     const sb = $skip(); if (sb) sb.hidden = false;
     gsap.to(camera.position, { z: 440, duration: 1.2, ease: "power1.out" });
-    const go = ()=>{ focusOn(1); if(sb){ sb.hidden=true; sb.onclick=null; } }; // Mercury
+    const go = ()=>{ focusOn(1); if(sb){ sb.hidden=true; sb.onclick=null; } };
     if (sb) sb.onclick = go;
     gsap.delayedCall(1.4, go);
   };
 
-  // ------------ focus/lock ------------
+  // ---------- lock/focus ----------
+  let focusIndex = 0;
+  const lookAtTarget = new THREE.Vector3();
   function focusOn(index) {
     index = THREE.MathUtils.clamp(index, 0, focusTargets.length-1);
     focusIndex = index;
     const obj = focusTargets[focusIndex];
 
-    // size-aware offset: bring camera in tighter for readable text
     const radius = obj.geometry?.parameters?.radius || 6;
-    const dist   = radius * 3.8;   // was 5.5 → closer
+    const dist   = radius * 3.6;   // nice and close
     const height = radius * 1.6;
-    const tpos   = obj.position.clone();
-    const dest   = tpos.clone().add(new THREE.Vector3(0, height, dist));
 
-    // update HUD card text + pop it in
+    const tpos = obj.position.clone();
+    const dest = tpos.clone().add(new THREE.Vector3(0, height, dist));
+
+    // update on-screen HUD
     if ($title()) $title().textContent = obj.userData?.name || obj.name || "Planet";
     if ($sub())   $sub().textContent   = obj.userData?.label || (obj === focusTargets[0] ? "Home" : "");
     if ($card() && $card().hidden) {
@@ -298,27 +305,26 @@
       gsap.fromTo($card(), { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" });
     }
 
-    // make on-planet sprite label visible while locked, others fade
+    // show only the focused planet's curved label
     labels.forEach((s, i) => {
       const visible = (obj === planets[i]);
-      gsap.to(s.material, { opacity: visible ? 1 : 0, duration: 0.2 });
+      gsap.to(s.material, { opacity: visible ? 1 : 0, duration: 0.18 });
     });
 
     gsap.to(camera.position, { x: dest.x, y: dest.y, z: dest.z, duration: 0.8, ease: "power2.out" });
     gsap.to(lookAtTarget,     { x: tpos.x, y: tpos.y, z: tpos.z, duration: 0.8, ease: "power2.out" });
   }
 
-  // Step focus when using Arrow keys
   function stepFocus(dir){
     const next = THREE.MathUtils.clamp(focusIndex + dir, 0, focusTargets.length-1);
     focusOn(next);
   }
 
-  // Mouse wheel: lock onto what you’re *pointing at*; if nothing, step
+  // scroll: lock the planet under the cursor (if any); otherwise step
   let lastWheel = 0;
   function onWheel(e){
     const now = performance.now();
-    if (now - lastWheel < 300) return; // debounced snap
+    if (now - lastWheel < 280) return; // snappy debounce
     lastWheel = now;
     e.preventDefault();
 
@@ -326,20 +332,13 @@
     const hits = raycaster.intersectObjects(planets, false);
     if (hits.length){
       const idx = planets.indexOf(hits[0].object);
-      focusOn(idx + 1); // +1 because Sun proxy is index 0
+      focusOn(idx + 1); // +1: Sun proxy is index 0
     } else {
       stepFocus(e.deltaY > 0 ? 1 : -1);
     }
   }
 
-  // ------------ pointer hover ------------
-  function setLabelVisible(sprite, visible) {
-    if (!sprite) return;
-    const target = visible ? 1 : 0;
-    if (sprite.material.opacity === target) return;
-    gsap.to(sprite.material, { opacity: target, duration: 0.2, ease: "power2.out" });
-  }
-
+  // ---------- hover + click ----------
   function onPointerMove(e) {
     mouse.x =  (e.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -349,18 +348,15 @@
     if (hits.length) {
       const obj = hits[0].object;
       const idx = planets.indexOf(obj);
-      setLabelVisible(labels[idx], true);
-      if (hovered && hovered !== obj) setLabelVisible(labels[planets.indexOf(hovered)], false);
+      // we keep labels hidden unless focused; hover doesn't force-show anymore
       hovered = obj;
       document.body.style.cursor = "pointer";
     } else {
-      if (hovered) setLabelVisible(labels[planets.indexOf(hovered)], false);
       hovered = null;
       document.body.style.cursor = "default";
     }
   }
 
-  // Click → open URL
   function onClick() {
     if (!hovered) return;
     const url = hovered.userData.url;
@@ -373,51 +369,36 @@
     camera.updateProjectionMatrix();
   }
 
-  // ------------ animate ------------
+  // ---------- animate ----------
   function animate(){
     requestAnimationFrame(animate);
 
-    // gentle sun spin
     if (sun) sun.rotation.y += 0.002;
 
-    planets.forEach((p, i) => {
+    planets.forEach((p) => {
       p.userData.angle += p.userData.speed;
       const r = p.userData.orbit;
       p.position.set(Math.cos(p.userData.angle)*r, 0, Math.sin(p.userData.angle)*r);
       p.rotation.y += p.userData.baseRot;
-
-      // keep ring + label with planet
-      if (p.userData.ring) p.userData.ring.position.copy(p.position);
-      const s = labels[i];
-      if (s){
-        const h = (p.geometry.parameters.radius || 1) + 9;
-        s.position.set(p.position.x, p.position.y + h, p.position.z);
-        s.lookAt(camera.position);
-      }
+      // rings & labels are children now, so they follow automatically
     });
 
-    // aim camera at target of interest
     camera.lookAt(lookAtTarget);
 
-    // position HTML lock card above focused target in screen space
-    if ($card() && !$card().hidden && focusTargets.length){
+    // keep the HTML lock card above the focused object
+    const card = $card();
+    if (card && !card.hidden && focusTargets.length){
       const obj = focusTargets[focusIndex];
       const radius = obj.geometry?.parameters?.radius || 6;
-      worldAbove.copy(obj.position).add(new THREE.Vector3(0, radius + 12, 0)); // higher = more readable
+      worldAbove.copy(obj.position).add(new THREE.Vector3(0, radius + 12, 0));
       worldAbove.project(camera);
       screen.x = (worldAbove.x * 0.5 + 0.5) * window.innerWidth;
       screen.y = (-worldAbove.y * 0.5 + 0.5) * window.innerHeight;
-      $card().style.left = `${screen.x}px`;
-      $card().style.top  = `${screen.y}px`;
+      card.style.left = `${screen.x}px`;
+      card.style.top  = `${screen.y}px`;
     }
 
     renderer.render(scene, camera);
   }
-
-  // ------------ bootstrap hint ------------
-  document.addEventListener("DOMContentLoaded", ()=> {
-    const hint = document.getElementById("hint");
-    if (hint) gsap.to(hint, { opacity: 1, delay: 1.2, duration: .6 });
-  });
 
 })();
