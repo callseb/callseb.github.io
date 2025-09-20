@@ -8,66 +8,47 @@
   <!-- Three.js + GSAP -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/MotionPathPlugin.min.js"></script>
-  <!-- App scripts -->
-  <script defer src="entryHole.js"></script>
-  <script defer src="planetScript.js"></script>
-  <script defer src="script.js"></script>
+
+  <!-- ENTRY (Black hole) -->
+  <script defer src="entryBlackhole.js"></script>
+
+  <!-- SOLAR SYSTEM -->
+  <script defer src="solarSystem.js"></script>
+
+  <!-- Orchestrator -->
+  <script defer>
+    // Starts entry on load; when entry completes it boots the solar system + intro hop.
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.startEntry) {
+        window.startEntry({
+          onComplete: () => {
+            if (window.initSolarSystem) {
+              window.initSolarSystem();
+              if (window.startWelcomeSequence) window.startWelcomeSequence();
+            }
+          }
+        });
+      }
+    });
+  </script>
 </head>
 <body>
+  <!-- Entry canvas (black hole / wormhole) -->
+  <canvas id="entry-canvas"></canvas>
 
-  <!-- ENTRY OVERLAY (Dali/Ghibli black hole + UFO) -->
-  <section id="entry" class="overlay">
-    <!-- your crazy-4 tunnel runs on this canvas -->
-    <canvas id="entry-hole"></canvas>
-
-    <!-- Black-hole vignette glow -->
-    <div class="entry-vignette" aria-hidden="true"></div>
-
-    <!-- UFO -->
-    <svg id="ufoSvg" viewBox="0 0 220 130" class="ufo">
-      <defs>
-        <radialGradient id="glow" cx="50%" cy="50%" r="60%">
-          <stop offset="0%" stop-color="#9dff9d" stop-opacity="0.9"/>
-          <stop offset="100%" stop-color="#00ff66" stop-opacity="0.0"/>
-        </radialGradient>
-        <linearGradient id="hull" x1="0" x2="1">
-          <stop offset="0%" stop-color="#a7b0b9"/>
-          <stop offset="50%" stop-color="#d7dde4"/>
-          <stop offset="100%" stop-color="#8c96a1"/>
-        </linearGradient>
-      </defs>
-      <ellipse cx="110" cy="110" rx="70" ry="15" fill="url(#glow)"/>
-      <g>
-        <ellipse cx="110" cy="55" rx="45" ry="25" fill="#b7f5ff" stroke="#e9ffff" stroke-width="2"/>
-        <ellipse cx="110" cy="55" rx="12" ry="14" fill="#98f59e" opacity="0.9"/>
-        <ellipse cx="105" cy="53" rx="4" ry="6" fill="#222"/>
-        <ellipse cx="115" cy="53" rx="4" ry="6" fill="#222"/>
-        <circle cx="110" cy="61" r="2" fill="#2a2a2a"/>
-      </g>
-      <ellipse cx="110" cy="80" rx="90" ry="28" fill="url(#hull)" />
-      <g fill="#ffe66d">
-        <circle cx="60" cy="80" r="6"/><circle cx="85" cy="80" r="6"/>
-        <circle cx="110" cy="80" r="6"/><circle cx="135" cy="80" r="6"/>
-        <circle cx="160" cy="80" r="6"/>
-      </g>
-    </svg>
-
-    <button id="enterBtn" class="ufo-enter" aria-label="Begin">Begin</button>
-  </section>
-
-  <!-- MAIN 3D SCENE -->
-  <canvas id="solar-scene"></canvas>
+  <!-- Main 3D canvas -->
+  <canvas id="solar-scene" class="hidden"></canvas>
 
   <!-- HUD -->
-  <div id="hint">hover a planet • click to open</div>
-  <button id="tour-skip" hidden aria-label="Skip intro">Skip</button>
+  <div id="hint" class="hud hint hidden">hover a planet • click to open • scroll to lock</div>
+  <button id="tour-skip" class="hud skip hidden" aria-label="Skip intro">Skip</button>
 
-  <!-- Screen-locked card that follows the focused planet -->
-  <div id="lock-card" class="lock-card" hidden>
+  <!-- Locked label (beautiful Dali/Ghibli-style card) -->
+  <div id="lock-card" class="lock-card hidden">
     <div class="lock-card-inner">
       <div class="lock-title" id="lock-title">Planet</div>
       <div class="lock-sub" id="lock-sub">Section</div>
+      <div class="lock-pulse"></div>
     </div>
   </div>
 
