@@ -4,29 +4,84 @@
   --hudBg: rgba(10,12,18,.55);
   --hudBorder: rgba(255,255,255,.10);
 }
+
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:#000;color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;overflow:hidden}
-
-/* Landing */
-.overlay{position:fixed;inset:0;display:grid;place-items:center;background:#000;z-index:3}
-.intro-inner{text-align:center;color:#ffeeb0}
-#ufo-btn{margin-top:1rem;padding:.6rem 1rem;border-radius:10px;border:1px solid var(--hudBorder);background:var(--hudBg);color:#ffeeb0;cursor:pointer}
-
-/* Canvas */
-#solar-scene{position:fixed;inset:0;width:100%;height:100%;display:block}
-
-/* Hint + Skip */
-#hint{position:fixed;right:14px;top:14px;padding:.35rem .6rem;font-size:.9rem;border:1px solid var(--hudBorder);
-  border-radius:8px;backdrop-filter:blur(6px);background:var(--hudBg);z-index:2;opacity:0;transition:opacity .3s}
-#tour-skip{position:fixed;right:14px;bottom:14px;padding:.5rem .8rem;font:600 14px system-ui;color:#0b1020;background:#e9ffd0;
-  border:1px solid var(--hudBorder);border-radius:10px;cursor:pointer;z-index:2;box-shadow:0 6px 20px rgba(0,0,0,.35)}
-
-/* Lock card (above focused planet) */
-.lock-card{position:fixed;left:0;top:0;transform:translate(-50%,-100%);z-index:2;pointer-events:none}
-.lock-card-inner{
-  padding:.5rem .75rem;border-radius:12px;border:1px solid var(--hudBorder);background:var(--hudBg);
-  backdrop-filter: blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.45)
+body{
+  background:#000;
+  color:var(--txt);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  overflow:hidden;
 }
-.lock-title{font-weight:700;font-size:14px;letter-spacing:.02em}
-.lock-sub{opacity:.85;font-size:12px;margin-top:2px}
+
+/* ===== Overlay (welcome) ===== */
+.overlay{
+  position:fixed; inset:0; display:grid; place-items:center;
+  background:
+    radial-gradient(600px 300px at 50% 60%, rgba(180,255,91,0.08), transparent 60%),
+    #000;
+  z-index:3;
+}
+.intro-inner{
+  text-align:center;
+  text-shadow:0 0 10px rgba(180,255,91,.25), 0 0 24px rgba(180,255,91,.2);
+  padding:24px;
+}
+.intro-inner h1{ margin:0 0 .4rem; font-size: clamp(34px, 6.5vw, 76px); color:#e3ff9e; }
+.intro-inner .sub{ opacity:.75; }
+#ufo-btn{
+  margin-top:1rem;
+  padding:.75rem 1rem;
+  font-weight:700;
+  border-radius:12px;
+  border:1px solid var(--hudBorder);
+  background:#e3ff9e; color:#0b1020;
+  cursor:pointer;
+  box-shadow:0 10px 40px rgba(0,0,0,.35);
+}
+
+/* ===== WebGL canvas ===== */
+#solar-scene{
+  position:fixed; inset:0; width:100%; height:100%; display:block;
+}
+
+/* ===== HUD ===== */
+#hint{
+  position: fixed; right:14px; top:14px;
+  padding:.35rem .6rem; font-size:.9rem;
+  border:1px solid var(--hudBorder);
+  border-radius:10px;
+  backdrop-filter: blur(6px);
+  background: var(--hudBg); color:var(--txt);
+  z-index:2; opacity:0; transition: opacity .3s ease;
+}
+#tour-skip{
+  position: fixed; right:14px; bottom:14px;
+  padding:.5rem .8rem; font:600 14px system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  color:#0b1020; background:#e9ffd0; border:1px solid var(--hudBorder);
+  border-radius:10px; cursor:pointer; z-index:3;
+  box-shadow:0 6px 20px rgba(0,0,0,.35);
+}
+
+/* ===== Lock card (appears when focused on a planet) ===== */
+.lock-card{
+  position: fixed; left:50%; transform: translateX(-50%);
+  top: 10vh;
+  z-index: 3; pointer-events:none;
+}
+.lock-card-inner{
+  padding:.6rem .9rem; min-width:220px; text-align:center;
+  border:1px solid var(--hudBorder);
+  border-radius:14px;
+  background: var(--hudBg);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+  transform-origin: center;
+}
+.lock-title{
+  font-weight:800; letter-spacing:.02em;
+  font-size: clamp(18px, 3vw, 24px);
+}
+.lock-sub{
+  margin-top:.15rem; opacity:.9; font-size: .9rem;
+}
