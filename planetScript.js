@@ -1,29 +1,30 @@
 /*
- * planetScript.js — Welcome → Overview → Focus + scroll lock
- * - Detailed Sun w/ glow
- * - Far star shell (round sprites; no near fly-bys)
- * - Slower, spaced orbits + orbit rings
- * - Hover labels + click-through
- * - Scroll (or ←/→) to lock onto bodies; animated lock-card shown above
+ * planetScript.js — Detailed Sun, star shell, spaced slow orbits,
+ * scroll-to-lock (Sun→Neptune), and a screen-locked card that follows the target.
  * Exposes:
  *   window.initSolarSystem()
- *   window.startWelcomeSequence()
+ *   window.focusNext(dir)   // dir=+1/-1
  */
-
 (function () {
   const TEX = "https://threejs.org/examples/textures/planets";
   const STAR_SPRITE = "https://threejs.org/examples/textures/sprites/disc.png";
 
-  // ------- helpers -------
-  function getOrCreateCanvas() {
-    let canvas = document.getElementById("solar-scene") || document.getElementById("scene");
-    if (!canvas) {
-      canvas = document.createElement("canvas");
-      canvas.id = "solar-scene";
-      Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100%", height: "100%", display: "block" });
-      document.body.appendChild(canvas);
-    }
-    return canvas;
+  let renderer, scene, camera;
+  let planets = [], labels = [], sun;
+  let raycaster, mouse, hovered = null;
+  let focusTargets = [], focusIndex = 0;
+  const lookAtTarget = new THREE.Vector3(0,0,0);
+
+  // HUD lock card refs
+  const lockCard = () => document.getElementById('lock-card');
+  const lockTitle = () => document.getElementById('lock-title');
+  const lockSub = () => document.getElementById('lock-sub');
+
+  // ===== Utilities =====
+  function getCanvas() {
+    const c = document.getElementById("solar-scene");
+    if (!c) console.warn("No #solar-scene canvas");
+    return c;
   }
 
   function makeStars({ count = 5000, rMin = 700, rMax = 1300, size = 1.8 } = {}) {
@@ -46,36 +47,6 @@
     return new THREE.Points(geo, mat);
   }
 
-  function makeCurvedLabel(text, diameterPx = 200) {
-    const pad = 24, size = diameterPx + pad * 2;
-    const cvs = document.createElement("canvas");
-    cvs.width = cvs.height = size;
-    const ctx = cvs.getContext("2d");
-    ctx.clearRect(0, 0, size, size);
-    ctx.translate(size/2, size/2);
-
-    const radius = diameterPx/2;
-    const chars = [...text];
-    ctx.font = `800 26px Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`;
-    ctx.fillStyle = "#ffeeb0";
-    ctx.shadowColor = "rgba(255,200,80,.35)";
-    ctx.shadowBlur = 12;
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "center";
-
-    const arc = Math.PI * 0.9;
-    const step = arc / Math.max(chars.length, 1);
-    let angle = -arc/2;
-    for (const ch of chars) {
-      ctx.save(); ctx.rotate(angle); ctx.translate(0, -radius); ctx.rotate(-Math.PI/2);
-      ctx.fillText(ch, 0, 0); ctx.restore();
-      angle += step;
-    }
-    const tex = new THREE.CanvasTexture(cvs);
-    tex.anisotropy = 8;
-    return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0 }));
-  }
-
   function makePlanetMaterial(url, fallbackColor = 0x888888) {
     const loader = new THREE.TextureLoader();
     const mat = new THREE.MeshStandardMaterial({ color: fallbackColor, roughness: 1, metalness: 0 });
@@ -92,7 +63,6 @@
     });
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(18, 64, 64), sunMat);
     g.add(sphere);
-
     // halo sprite
     const cvs = document.createElement("canvas"); cvs.width = cvs.height = 256;
     const c = cvs.getContext("2d"), grad = c.createRadialGradient(128,128,0,128,128,128);
@@ -100,61 +70,68 @@
     c.fillStyle = grad; c.fillRect(0,0,256,256);
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true, depthWrite: false }));
     glow.scale.set(80,80,1); g.add(glow);
-
     g.name = "Sun";
     return g;
   }
 
-  // ------- singletons & state -------
-  let renderer, scene, camera;
-  let sun, planets = [], labels = [];
-  let raycaster, mouse, hovered = null;
+  function screenProject(vec3) {
+    // project a Vector3 into screen coordinates
+    const width = renderer.domElement.clientWidth;
+    const height = renderer.domElement.clientHeight;
+    const proj = vec3.clone().project(camera);
+    return {
+      x: (proj.x * 0.5 + 0.5) * width,
+      y: ( -proj.y * 0.5 + 0.5) * height
+    };
+  }
 
-  const PLANETS = [
-    { name:"Mercury", tex:`${TEX}/mercury.jpg`,              color:0x9c9c9c, size:2.2, orbit: 46,  speed:0.010, url:"about.html",       label:"About"   },
-    { name:"Venus",   tex:`${TEX}/venus.jpg`,                color:0xd8b57a, size:3.5, orbit: 66,  speed:0.008, url:"writing.html",     label:"Writing" },
-    { name:"Earth",   tex:`${TEX}/earth_atmos_2048.jpg`,     color:0x5aa0ff, size:3.7, orbit: 86,  speed:0.007, url:"projects.html",    label:"Projects"},
-    { name:"Mars",    tex:`${TEX}/mars_1k_color.jpg`,        color:0xb55a3c, size:3.0, orbit:110,  speed:0.006, url:"photography.html", label:"Photos"  },
-    { name:"Jupiter", tex:`${TEX}/jupiter2_1024.jpg`,        color:0xe0c7a2, size:8.5, orbit:150,  speed:0.004, url:"resume.html",      label:"Resume"  },
-    { name:"Saturn",  tex:`${TEX}/saturn.jpg`,               color:0xdcc7a0, size:7.5, orbit:200,  speed:0.004, url:"contact.html",     label:"Contact" },
-    { name:"Uranus",  tex:`${TEX}/uranus.jpg`,               color:0x88e0e8, size:6.0, orbit:250,  speed:0.003, url:"links.html",       label:"Links"   },
-    { name:"Neptune", tex:`${TEX}/neptune.jpg`,              color:0x4a6eff, size:5.8, orbit:290,  speed:0.003, url:"blog.html",        label:"Blog"    },
-  ];
+  function updateLockCard(targetMesh) {
+    const card = lockCard();
+    if (!card || !targetMesh) return;
 
-  // focus state
-  let focusTargets = []; // [sun, ...planets]
-  let focusIndex = 0;
-  const lookAtTarget = new THREE.Vector3(0,0,0);
+    const radius = targetMesh.geometry?.parameters?.radius || 6;
+    const anchor = targetMesh.position.clone().add(new THREE.Vector3(0, radius + 7, 0));
+    const pt = screenProject(anchor);
 
-  // ------- API: init -------
+    // place the card slightly above the planet on screen
+    card.style.transform = `translate(${Math.round(pt.x)}px, ${Math.round(pt.y)}px) translate(-50%,-120%)`;
+  }
+
+  // ===== Init =====
   window.initSolarSystem = function initSolarSystem() {
-    const canvas = getOrCreateCanvas();
-
-    // renderer
+    const canvas = getCanvas();
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
-    scene.add(makeStars()); // far shell, always visible
+    scene.add(makeStars()); // far, visible, round stars
 
-    // camera (closer & higher than the very-far overview)
     camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 8000);
     camera.position.set(0, 140, 520);
 
-    // lights
     const ambient = new THREE.AmbientLight(0xffffff, 0.55);
     const sunLight = new THREE.PointLight(0xffffff, 2.4, 0, 2);
     sunLight.position.set(0, 0, 0);
     scene.add(ambient, sunLight);
 
-    // Sun
     sun = buildSun();
     scene.add(sun);
 
-    // orbit rings (subtle)
+    // planets — spaced, slow
+    const PLANETS = [
+      { name:"Mercury", tex:`${TEX}/mercury.jpg`,              color:0x9c9c9c, size:2.2, orbit: 46,  speed:0.010, url:"about.html",       label:"About"   },
+      { name:"Venus",   tex:`${TEX}/venus.jpg`,                color:0xd8b57a, size:3.5, orbit: 66,  speed:0.008, url:"writing.html",     label:"Writing" },
+      { name:"Earth",   tex:`${TEX}/earth_atmos_2048.jpg`,     color:0x5aa0ff, size:3.7, orbit: 86,  speed:0.007, url:"projects.html",    label:"Projects"},
+      { name:"Mars",    tex:`${TEX}/mars_1k_color.jpg`,        color:0xb55a3c, size:3.0, orbit:110,  speed:0.006, url:"photography.html", label:"Photos"  },
+      { name:"Jupiter", tex:`${TEX}/jupiter2_1024.jpg`,        color:0xe0c7a2, size:8.5, orbit:150,  speed:0.004, url:"resume.html",      label:"Resume"  },
+      { name:"Saturn",  tex:`${TEX}/saturn.jpg`,               color:0xdcc7a0, size:7.5, orbit:200,  speed:0.004, url:"contact.html",     label:"Contact" },
+      { name:"Uranus",  tex:`${TEX}/uranus.jpg`,               color:0x88e0e8, size:6.0, orbit:250,  speed:0.003, url:"links.html",       label:"Links"   },
+      { name:"Neptune", tex:`${TEX}/neptune.jpg`,              color:0x4a6eff, size:5.8, orbit:290,  speed:0.003, url:"blog.html",        label:"Blog"    },
+    ];
+
+    // orbit rings
     PLANETS.forEach(p => {
       const segs = 256, pts = [];
       for (let i = 0; i <= segs; i++) {
@@ -166,10 +143,8 @@
       scene.add(new THREE.LineLoop(geo, mat));
     });
 
-    // planets
-    planets = []; labels = [];
+    // build planets + labels
     const loader = new THREE.TextureLoader();
-
     PLANETS.forEach((cfg, i) => {
       const mat = makePlanetMaterial(cfg.tex, cfg.color);
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(cfg.size, 64, 64), mat);
@@ -182,7 +157,17 @@
       scene.add(mesh);
       planets.push(mesh);
 
-      const sprite = makeCurvedLabel(`${cfg.name} • ${cfg.label}`, 220);
+      // canvas-curved label as sprite (fades on hover; lock card handles "locked" state)
+      const cvs = document.createElement("canvas"); cvs.width = cvs.height = 300;
+      const ctx = cvs.getContext("2d");
+      ctx.translate(150,150);
+      ctx.font = "600 26px Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif";
+      ctx.fillStyle = "#ffeeb0"; ctx.shadowColor = "rgba(255,200,80,.35)"; ctx.shadowBlur = 12;
+      const text = `${cfg.name} • ${cfg.label}`;
+      const chars = [...text], arc = Math.PI * 0.9, step = arc / Math.max(chars.length, 1);
+      let ang = -arc/2;
+      for(const ch of chars){ ctx.save(); ctx.rotate(ang); ctx.translate(0, -90); ctx.rotate(-Math.PI/2); ctx.fillText(ch, 0, 0); ctx.restore(); ang += step; }
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true, depthWrite: false, opacity: 0 }));
       sprite.scale.set(18, 9, 1);
       sprite.position.copy(mesh.position).add(new THREE.Vector3(0, cfg.size + 7, 0));
       scene.add(sprite);
@@ -201,91 +186,56 @@
       }
     });
 
-    // focus targets (Sun + planets)
-    focusTargets = [sun, ...planets];
-
     // interactions
     raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2();
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("click", onClick);
     window.addEventListener("resize", onResize);
 
-    // scroll + arrows move focus
-    window.addEventListener("wheel", onWheel, { passive:false });
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") focusOn(focusIndex + 1);
-      if (e.key === "ArrowLeft")  focusOn(focusIndex - 1);
-    });
+    // focus list
+    focusTargets = [sun, ...planets];
+    focusIndex = 0;
 
     animate();
   };
 
-  // ------- API: welcome sequence (overview → Mercury) -------
-  window.startWelcomeSequence = function startWelcomeSequence() {
-    // start zoomed-out overview
-    camera.position.set(0, 200, 700);
-    camera.lookAt(0,0,0);
-
-    const skipBtn = document.getElementById("tour-skip");
-    if (skipBtn) skipBtn.hidden = false;
-
-    // subtle dolly
-    gsap.to(camera.position, { z: 560, duration: 1.6, ease: "power1.out" });
-
-    const goFirst = () => {
-      focusOn(1); // Mercury
-      if (skipBtn) {
-        skipBtn.hidden = true;
-        skipBtn.onclick = null;
-      }
-    };
-    if (skipBtn) skipBtn.onclick = goFirst;
-    gsap.delayedCall(2.0, goFirst);
-  };
-
-  // ------- focus logic -------
+  // ===== Focus system =====
   function focusOn(index) {
     focusIndex = THREE.MathUtils.clamp(index, 0, focusTargets.length - 1);
     const obj = focusTargets[focusIndex];
 
-    const radius = obj.geometry?.parameters?.radius || 6;
-    const dist   = radius * 5.5;  // closer than before
-    const height = radius * 2.2;
+    const card = lockCard(); if (card && card.hidden) card.hidden = false;
+    const title = obj.name || obj.userData?.name || (obj === sun ? "Sun" : "Object");
+    const subtitle = obj.userData?.label || (obj === sun ? "Home" : "");
+    if (lockTitle()) lockTitle().textContent = title;
+    if (lockSub()) lockSub().textContent = subtitle;
 
+    // distance based on radius
+    const radius = obj.geometry?.parameters?.radius || 6;
+    const dist   = radius * 5.5;
+    const height = radius * 2.2;
     const targetPos = obj.position.clone();
     const dest = targetPos.clone().add(new THREE.Vector3(0, height, dist));
 
     gsap.to(camera.position, { x: dest.x, y: dest.y, z: dest.z, duration: 0.9, ease: "power2.out" });
     gsap.to(lookAtTarget,     { x: targetPos.x, y: targetPos.y, z: targetPos.z, duration: 0.9, ease: "power2.out" });
-
-    // update + show lock card
-    const card = document.getElementById("lock-card");
-    const title = document.getElementById("lock-title");
-    const sub = document.getElementById("lock-sub");
-    const name = obj.name || obj.userData?.name || (obj === sun ? "Sun" : "Object");
-    const label = obj.userData?.label || (obj === sun ? "Home" : "");
-    if (title) title.textContent = name;
-    if (sub) sub.textContent = label;
-    if (card) {
-      card.hidden = false;
-      gsap.fromTo(card.querySelector(".lock-card-inner"),
-        { y: -6, scale: .96, opacity: .0 },
-        { y: 0,  scale: 1.0, opacity: 1, duration: .28, ease: "power2.out" }
-      );
-    }
   }
 
-  function onWheel(e){
-    e.preventDefault();
-    const dir = e.deltaY > 0 ? 1 : -1;
-    focusOn(focusIndex + dir);
-  }
+  window.focusNext = function(dir){ focusOn(focusIndex + (dir>0?1:-1)); };
 
-  // ------- hover/click -------
+  // wheel = step focus; arrows too
+  window.addEventListener("wheel", (e) => { e.preventDefault(); focusOn(focusIndex + (e.deltaY > 0 ? 1 : -1)); }, { passive:false });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight") focusOn(focusIndex + 1);
+    if (e.key === "ArrowLeft")  focusOn(focusIndex - 1);
+  });
+
+  // ===== Hover (sprite labels) & click-through =====
   function setLabelVisible(sprite, visible) {
+    if (!sprite) return;
     const target = visible ? 1 : 0;
-    if (!sprite || sprite.material.opacity === target) return;
-    gsap.to(sprite.material, { opacity: target, duration: 0.25, ease: "power2.out" });
+    if (sprite.material.opacity === target) return;
+    gsap.to(sprite.material, { opacity: target, duration: 0.2, ease: "power2.out" });
   }
 
   function onPointerMove(e) {
@@ -308,21 +258,18 @@
       document.body.style.cursor = "default";
     }
   }
-
   function onClick() {
     if (!hovered) return;
     const url = hovered.userData.url;
     if (url) window.location.href = url;
   }
-
   function onResize() {
-    if (!renderer || !camera) return;
     renderer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
   }
 
-  // ------- animate -------
+  // ===== animate =====
   function animate() {
     requestAnimationFrame(animate);
 
@@ -331,20 +278,25 @@
 
     // Orbits + label tracking
     planets.forEach((p, i) => {
-      p.userData.angle += p.userData.speed; // slowed orbits
+      p.userData.angle += p.userData.speed;
       const r = p.userData.orbit;
       p.position.set(Math.cos(p.userData.angle) * r, 0, Math.sin(p.userData.angle) * r);
       p.rotation.y += p.userData.baseRot;
 
-      const label = labels[i];
-      if (label) {
+      const spr = labels[i];
+      if (spr) {
         const h = (p.geometry.parameters.radius || 1) + 7;
-        label.position.set(p.position.x, p.position.y + h, p.position.z);
-        label.lookAt(camera.position);
+        spr.position.set(p.position.x, p.position.y + h, p.position.z);
+        spr.lookAt(camera.position);
       }
     });
 
+    // keep camera aimed
     camera.lookAt(lookAtTarget);
+
+    // update screen-locked card to the current focus target
+    updateLockCard(focusTargets[focusIndex]);
+
     renderer.render(scene, camera);
   }
 })();
