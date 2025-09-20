@@ -5,56 +5,46 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Cosmic Portfolio — Sebastian Callahan</title>
   <link rel="stylesheet" href="styles.css" />
+
   <!-- Three.js + GSAP -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
-  <!-- ENTRY (Black hole) -->
+  <!-- Optional: your wormhole adapter. If missing, we silently fall back. -->
+  <script defer src="crazy4-wormhole.js"></script>
+
+  <!-- App code -->
   <script defer src="entryBlackhole.js"></script>
-
-  <!-- SOLAR SYSTEM -->
   <script defer src="solarSystem.js"></script>
-
-  <!-- Orchestrator -->
-  <script defer>
-    // Starts entry on load; when entry completes it boots the solar system + intro hop.
-    window.addEventListener('DOMContentLoaded', () => {
-      if (window.startEntry) {
-        window.startEntry({
-          onComplete: () => {
-            if (window.initSolarSystem) {
-              window.initSolarSystem();
-              if (window.startWelcomeSequence) window.startWelcomeSequence();
-            }
-          }
-        });
-      }
-    });
-  </script>
 </head>
 <body>
-  <!-- Entry canvas (black hole / wormhole) -->
-  <canvas id="entry-canvas"></canvas>
 
-  <!-- Main 3D canvas -->
-  <canvas id="solar-scene" class="hidden"></canvas>
+  <!-- ENTRY LAYER (black hole + UFO) -->
+  <div id="entry-layer">
+    <canvas id="entry-scene"></canvas>
+    <div id="entry-ui">
+      <button id="entry-skip" aria-label="Skip intro">Skip</button>
+    </div>
+  </div>
+
+  <!-- MAIN: SOLAR SYSTEM -->
+  <canvas id="solar-scene" aria-label="Solar system"></canvas>
 
   <!-- HUD -->
-  <div id="hint" class="hud hint hidden">hover a planet • click to open • scroll to lock</div>
-  <button id="tour-skip" class="hud skip hidden" aria-label="Skip intro">Skip</button>
+  <div id="hint">hover a planet • click to open</div>
+  <button id="tour-skip" hidden aria-label="Skip overview">Skip</button>
 
-  <!-- Locked label (beautiful Dali/Ghibli-style card) -->
-  <div id="lock-card" class="lock-card hidden">
+  <!-- Locked label card (pinned over planet when focused) -->
+  <div id="lock-card" class="lock-card" hidden>
     <div class="lock-card-inner">
       <div class="lock-title" id="lock-title">Planet</div>
       <div class="lock-sub" id="lock-sub">Section</div>
-      <div class="lock-pulse"></div>
     </div>
   </div>
 
   <noscript>
     <style>body{font-family:system-ui;padding:2rem}</style>
-    <p>This site needs JavaScript enabled to render the 3D universe.</p>
+    <p>This site needs JavaScript enabled.</p>
   </noscript>
 </body>
 </html>
