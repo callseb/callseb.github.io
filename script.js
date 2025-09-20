@@ -1,19 +1,24 @@
-// Handles the landing → scene handoff and guards init
+// Welcome → init scene → overview → lock on Mercury
 document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.getElementById("ufo-btn");
+  const btn   = document.getElementById("ufo-btn");
   const intro = document.getElementById("intro");
-  const hint = document.getElementById("hint");
+  const hint  = document.getElementById("hint");
 
   if (!btn) return;
 
   btn.addEventListener("click", () => {
-    // fade overlay away
+    // fade welcome out
     if (intro) {
       gsap.to(intro, { autoAlpha: 0, duration: 0.6, onComplete: () => intro.style.display = "none" });
     }
-    // init the solar system
+
+    // boot 3D
     if (window.initSolarSystem) window.initSolarSystem();
-    // reveal hint after a moment
-    gsap.to(hint, { opacity: 1, delay: 1.2, duration: .6 });
+
+    // hint after a moment
+    if (hint) gsap.to(hint, { opacity: 1, delay: 1.2, duration: .6 });
+
+    // run the overview → Mercury focus
+    if (window.startWelcomeSequence) window.startWelcomeSequence();
   });
 });
