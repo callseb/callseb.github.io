@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cosmic Journey — Sebastian Callahan</title>
+  <title>Cosmic Portfolio — Sebastian Callahan</title>
   <link rel="stylesheet" href="styles.css" />
   <!-- Three.js + GSAP -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -14,20 +14,20 @@
 </head>
 <body>
 
-  <!-- Landing overlay -->
+  <!-- Welcome overlay / entry background -->
   <section id="intro" class="overlay">
     <div class="intro-inner">
       <h1>Welcome</h1>
       <p>Begin your journey</p>
-      <p class="sub">Click the UFO to start.</p>
+      <p class="sub">Click to start</p>
       <button id="ufo-btn" aria-label="Enter">🚀 Enter</button>
     </div>
   </section>
 
-  <!-- 3D canvas -->
+  <!-- WebGL canvas -->
   <canvas id="solar-scene"></canvas>
 
-  <!-- HUD: hint + skip + lock card (shows when camera is locked on a planet) -->
+  <!-- UI: hint, skip, lock-card (shows on focused planet) -->
   <div id="hint">hover a planet • click to open</div>
   <button id="tour-skip" hidden aria-label="Skip intro">Skip</button>
 
