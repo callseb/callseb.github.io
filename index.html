@@ -14,25 +14,29 @@
 </head>
 <body>
 
-  <!-- Landing / intro overlay -->
+  <!-- Landing overlay -->
   <section id="intro" class="overlay">
     <div class="intro-inner">
       <h1>Welcome</h1>
       <p>Begin your journey</p>
       <p class="sub">Click the UFO to start.</p>
-
-      <!-- Visible, clickable UFO -->
-      <button id="ufo-btn" aria-label="Enter">
-        <img src="assets/ufo-icon.png" alt="UFO" />
-      </button>
+      <button id="ufo-btn" aria-label="Enter">🚀 Enter</button>
     </div>
   </section>
 
-  <!-- 3D scene -->
+  <!-- 3D canvas -->
   <canvas id="solar-scene"></canvas>
 
-  <!-- Hover hint (optional) -->
+  <!-- HUD: hint + skip + lock card (shows when camera is locked on a planet) -->
   <div id="hint">hover a planet • click to open</div>
+  <button id="tour-skip" hidden aria-label="Skip intro">Skip</button>
+
+  <div id="lock-card" class="lock-card" hidden>
+    <div class="lock-card-inner">
+      <div class="lock-title" id="lock-title">Planet</div>
+      <div class="lock-sub" id="lock-sub">Section</div>
+    </div>
+  </div>
 
   <noscript>
     <style>body{font-family:system-ui;padding:2rem}</style>
