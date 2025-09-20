@@ -10,31 +10,36 @@
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
-  <!-- Optional: your wormhole adapter. If missing, we silently fall back. -->
+  <!-- Optional: your crazy-4 wormhole lib (if present, we’ll use it) -->
   <script defer src="crazy4-wormhole.js"></script>
 
-  <!-- App code -->
-  <script defer src="entryBlackhole.js"></script>
-  <script defer src="solarSystem.js"></script>
+  <!-- App -->
+  <script defer src="entryHole.js"></script>
+  <script defer src="planetScript.js"></script>
+  <script defer src="script.js"></script>
 </head>
 <body>
 
-  <!-- ENTRY LAYER (black hole + UFO) -->
-  <div id="entry-layer">
-    <canvas id="entry-scene"></canvas>
-    <div id="entry-ui">
-      <button id="entry-skip" aria-label="Skip intro">Skip</button>
+  <!-- Entry / Blackhole layer -->
+  <section id="entry" class="entry-layer">
+    <canvas id="entry-canvas"></canvas>
+
+    <div class="welcome">
+      <h1>Welcome</h1>
+      <p>Begin your journey</p>
+      <p class="sub">Click the UFO to start.</p>
+      <button id="ufo-btn" aria-label="Enter" class="ufo-btn">🚀 Enter</button>
     </div>
-  </div>
+  </section>
 
-  <!-- MAIN: SOLAR SYSTEM -->
-  <canvas id="solar-scene" aria-label="Solar system"></canvas>
+  <!-- Main 3D canvas -->
+  <canvas id="solar-scene"></canvas>
 
-  <!-- HUD -->
+  <!-- UI overlays -->
   <div id="hint">hover a planet • click to open</div>
-  <button id="tour-skip" hidden aria-label="Skip overview">Skip</button>
+  <button id="tour-skip" hidden aria-label="Skip intro">Skip</button>
 
-  <!-- Locked label card (pinned over planet when focused) -->
+  <!-- Locked-on planet card (HTML, follows planet in screen space) -->
   <div id="lock-card" class="lock-card" hidden>
     <div class="lock-card-inner">
       <div class="lock-title" id="lock-title">Planet</div>
@@ -44,7 +49,7 @@
 
   <noscript>
     <style>body{font-family:system-ui;padding:2rem}</style>
-    <p>This site needs JavaScript enabled.</p>
+    <p>This site needs JavaScript enabled to render the 3D universe.</p>
   </noscript>
 </body>
 </html>
