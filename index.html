@@ -3,43 +3,56 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Cosmic Portfolio — Sebastian Callahan</title>
+  <title>Cosmic Journey — Sebastian Callahan</title>
   <link rel="stylesheet" href="styles.css" />
-
   <!-- Three.js + GSAP -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-
-  <!-- Optional: your crazy-4 wormhole lib (if present, we’ll use it) -->
-  <script defer src="crazy4-wormhole.js"></script>
-
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
   <!-- App -->
-  <script defer src="entryHole.js"></script>
-  <script defer src="planetScript.js"></script>
-  <script defer src="script.js"></script>
+  <script defer src="entry.js"></script>
+  <script defer src="solar.js"></script>
 </head>
 <body>
 
-  <!-- Entry / Blackhole layer -->
-  <section id="entry" class="entry-layer">
-    <canvas id="entry-canvas"></canvas>
+  <!-- ENTRY: full-screen wormhole + alien start -->
+  <section id="entry">
+    <canvas id="entry-wormhole"></canvas>
 
-    <div class="welcome">
-      <h1>Welcome</h1>
-      <p>Begin your journey</p>
-      <p class="sub">Click the UFO to start.</p>
-      <button id="ufo-btn" aria-label="Enter" class="ufo-btn">🚀 Enter</button>
-    </div>
+    <!-- Alien = Start button -->
+    <button id="alien-start" aria-label="Begin the journey">
+      <!-- Inline SVG so it’s crisp everywhere -->
+      <svg viewBox="0 0 220 130" class="ufo">
+        <defs>
+          <radialGradient id="ufoGlow" cx="50%" cy="50%" r="60%">
+            <stop offset="0%" stop-color="#9dff9d" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#00ff66" stop-opacity="0.0"/>
+          </radialGradient>
+          <linearGradient id="ufoHull" x1="0" x2="1">
+            <stop offset="0%" stop-color="#a7b0b9"/>
+            <stop offset="50%" stop-color="#d7dde4"/>
+            <stop offset="100%" stop-color="#8c96a1"/>
+          </linearGradient>
+        </defs>
+        <ellipse cx="110" cy="110" rx="70" ry="15" fill="url(#ufoGlow)"/>
+        <ellipse cx="110" cy="55" rx="45" ry="25" fill="#b7f5ff" stroke="#e9ffff" stroke-width="2"/>
+        <ellipse cx="110" cy="80" rx="90" ry="28" fill="url(#ufoHull)"/>
+        <g fill="#ffe66d">
+          <circle cx="60" cy="80" r="6"/><circle cx="85" cy="80" r="6"/>
+          <circle cx="110" cy="80" r="6"/><circle cx="135" cy="80" r="6"/>
+          <circle cx="160" cy="80" r="6"/>
+        </g>
+      </svg>
+    </button>
   </section>
 
-  <!-- Main 3D canvas -->
+  <!-- SOLAR SYSTEM -->
   <canvas id="solar-scene"></canvas>
 
-  <!-- UI overlays -->
+  <!-- UI -->
   <div id="hint">hover a planet • click to open</div>
   <button id="tour-skip" hidden aria-label="Skip intro">Skip</button>
 
-  <!-- Locked-on planet card (HTML, follows planet in screen space) -->
+  <!-- Lock card (pinned above focused planet) -->
   <div id="lock-card" class="lock-card" hidden>
     <div class="lock-card-inner">
       <div class="lock-title" id="lock-title">Planet</div>
