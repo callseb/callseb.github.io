@@ -1,193 +1,242 @@
-/* entryHole.js — Blackhole entry layer
-   - If window.createCrazy4Wormhole exists (your library), we use it.
-   - Otherwise we render a built-in vortex + UFO spiral + smoke trail.
-   Exposes: window.initEntry() and window.playEntry(next)
-*/
-(function () {
-  const SPRITE_URL = "https://threejs.org/examples/textures/sprites/disc.png";
+/* ENTRY — wormhole shader + alien button takeoff */
+(() => {
+  const entry = document.getElementById('entry');
+  const canvas = document.getElementById('entry-wormhole');
+  const startBtn = document.getElementById('alien-start');
 
-  let renderer, scene, camera, vortex, ufo, smokeGroup, animTL;
-  let entryCanvas, entryRoot;
+  let renderer, scene, camera, mesh, uniforms, smokeSys;
 
-  function ensureRenderer() {
-    entryCanvas = document.getElementById("entry-canvas");
-    if (!entryCanvas) return null;
-    renderer = new THREE.WebGLRenderer({ canvas: entryCanvas, antialias: true, alpha: true });
+  function initWormhole() {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
-    return renderer;
-  }
-
-  function makeBuiltInVortex() {
-    // A simple swirling shader on a plane to mimic a Dali-esque hole
-    const geo = new THREE.PlaneGeometry(40, 40, 1, 1);
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      uniforms: {
-        u_time: { value: 0 },
-        u_colorA: { value: new THREE.Color(0x0a0f1e) },
-        u_colorB: { value: new THREE.Color(0x010103) },
-      },
-      vertexShader: `
-        varying vec2 vUv;
-        void main(){
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
-        }`,
-      fragmentShader: `
-        precision highp float;
-        varying vec2 vUv;
-        uniform float u_time;
-        uniform vec3 u_colorA; uniform vec3 u_colorB;
-
-        float spiral(vec2 uv){
-          vec2 p = uv - 0.5;
-          float r = length(p)*2.0;
-          float a = atan(p.y,p.x);
-          float s = sin(8.0*a - u_time*1.6);
-          return smoothstep(1.2, 0.0, r + s*0.08);
-        }
-        void main(){
-          float v = spiral(vUv);
-          vec3 col = mix(u_colorB, u_colorA, v);
-          float rim = smoothstep(0.9, 0.4, length(vUv-0.5));
-          col *= rim;
-          gl_FragColor = vec4(col, 0.95);
-        }`
-    });
-    const m = new THREE.Mesh(geo, mat);
-    m.rotation.x = -Math.PI/2;
-    return m;
-  }
-
-  function makeUFO() {
-    const g = new THREE.Group();
-    const hull = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.6, 1.9, 0.38, 32),
-      new THREE.MeshStandardMaterial({ color: 0xaeb6c1, roughness: 0.4, metalness: 0.6 })
-    );
-    const dome = new THREE.Mesh(
-      new THREE.SphereGeometry(0.9, 32, 24),
-      new THREE.MeshStandardMaterial({ color: 0xbfefff, roughness: 0.15, metalness: 0.1, emissive: 0x66ccff, emissiveIntensity: 0.2 })
-    );
-    dome.scale.set(1, 0.6, 1);
-    dome.position.y = 0.45;
-    const rim = new THREE.Mesh(
-      new THREE.TorusGeometry(2.0, 0.08, 12, 48),
-      new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.25, metalness: 0.7 })
-    );
-    rim.rotation.x = Math.PI/2;
-
-    g.add(hull, dome, rim);
-    g.position.set(0, 1.2, 8);
-    return g;
-  }
-
-  function makeSmoke() {
-    const group = new THREE.Group();
-    const tex = new THREE.TextureLoader().load(SPRITE_URL);
-    for (let i=0;i<40;i++){
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: 0xb0e0d0, opacity: 0.4, transparent:true }));
-      s.scale.setScalar(THREE.MathUtils.randFloat(0.3, 0.9));
-      s.position.set(0,0,0);
-      s.userData.life = Math.random()*1.0;
-      group.add(s);
-    }
-    return group;
-  }
-
-  function tickSmoke(dt){
-    smokeGroup.children.forEach((s) => {
-      s.userData.life += dt*0.6;
-      const t = s.userData.life % 1.0;
-      s.position.lerp(ufo.position, 0.15);
-      s.position.x += (Math.random()-0.5)*0.06;
-      s.position.y += (Math.random())*0.02;
-      s.position.z += (Math.random()-0.5)*0.06;
-      s.material.opacity = 0.45*(1.0 - t);
-      s.scale.setScalar(0.2 + 1.1*(1.0 - t));
-    });
-  }
-
-  function onResize(){
-    if (!renderer || !camera) return;
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-  }
-
-  function animate(){
-    if (!renderer) return;
-    requestAnimationFrame(animate);
-    const t = performance.now()*0.001;
-    if (vortex.material?.uniforms?.u_time) vortex.material.uniforms.u_time.value = t;
-
-    ufo.rotation.y += 0.02;
-    tickSmoke(1/60);
-
-    renderer.render(scene, camera);
-  }
-
-  // PUBLIC
-  window.initEntry = function initEntry(){
-    entryRoot = document.getElementById("entry");
-    if (!ensureRenderer()) return;
 
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x02030a, 0.04);
-    camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 0.1, 100);
-    camera.position.set(0, 3.2, 10);
+    camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    // lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const key = new THREE.PointLight(0xffffff, 2.0, 0, 2); key.position.set(0,4,8); scene.add(key);
+    const geom = new THREE.PlaneBufferGeometry(2,2);
+    uniforms = {
+      u_time: { value: 0 },
+      u_aspect: { value: window.innerWidth / window.innerHeight },
+      u_intensity: { value: 1.0 }
+    };
 
-    // vortex (from crazy4 if available)
-    if (typeof window.createCrazy4Wormhole === "function") {
-      vortex = window.createCrazy4Wormhole(THREE);
-    } else {
-      vortex = makeBuiltInVortex();
-    }
-    scene.add(vortex);
+    // Dalí-esque “crazy wormhole” swirling into a singularity
+    const mat = new THREE.ShaderMaterial({
+      uniforms,
+      fragmentShader: `
+        precision highp float;
+        uniform float u_time;
+        uniform float u_aspect;
+        uniform float u_intensity;
 
-    ufo = makeUFO(); scene.add(ufo);
-    smokeGroup = makeSmoke(); scene.add(smokeGroup);
+        // hash + noise for marbling
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+        float noise(in vec2 p){
+          vec2 i = floor(p), f = fract(p);
+          float a = hash(i), b = hash(i+vec2(1.,0.));
+          float c = hash(i+vec2(0.,1.)), d = hash(i+vec2(1.,1.));
+          vec2 u = f*f*(3.0-2.0*f);
+          return mix(a,b,u.x) + (c-a)*u.y*(1.0-u.x) + (d-b)*u.x*u.y;
+        }
+
+        void main(){
+          vec2 uv = gl_FragCoord.xy / vec2( min(gl_FragCoord.w,1.0) ); // not used, but keeps precision hints happy
+          vec2 p = (gl_FragCoord.xy / vec2(textureSize)) * 2.0 - 1.0;
+        }
+      `,
+      // (we’ll swap in real shader below)
+    });
+
+    // Real fragment shader (separate for clarity)
+    mat.fragmentShader = `
+      precision highp float;
+      uniform float u_time;
+      uniform float u_aspect;
+      uniform float u_intensity;
+
+      // polar swirl into black hole
+      float sdCircle(vec2 p, float r){ return length(p)-r; }
+
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float noise(in vec2 p){
+        vec2 i = floor(p), f = fract(p);
+        float a = hash(i), b = hash(i+vec2(1.,0.));
+        float c = hash(i+vec2(0.,1.)), d = hash(i+vec2(1.,1.));
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(a,b,u.x) + (c-a)*u.y*(1.0-u.x) + (d-b)*u.x*u.y;
+      }
+
+      void main(){
+        vec2 uv = gl_FragCoord.xy / vec2(${window.innerWidth.toFixed(1)}, ${window.innerHeight.toFixed(1)});
+        vec2 p = (uv - .5) * vec2(u_aspect,1.0) * 2.0;
+
+        float r = length(p);
+        float a = atan(p.y, p.x);
+
+        // spiral flow
+        float t = u_time * 0.25;
+        float swirl = a + 10.0/(r+0.35) + t*1.4;
+
+        // marbled filaments
+        float fil = noise(vec2(swirl*1.2, r*6.0 - t*2.0));
+        float glow = smoothstep(.9, 1.2, fil + .15*sin(6.0*r - t*4.0));
+
+        // black hole core (event horizon)
+        float hole = smoothstep(0.22, 0.24, r);
+        float coreShadow = 1.0 - smoothstep(0.0, 0.22, r);
+
+        // palette: neon green → teal → indigo
+        vec3 c1 = vec3(0.70, 1.00, 0.70);
+        vec3 c2 = vec3(0.20, 0.95, 0.75);
+        vec3 c3 = vec3(0.20, 0.25, 0.85);
+        vec3 col = mix(c3, mix(c2, c1, glow), smoothstep(0.0, 1.0, 1.0-r));
+
+        // darken toward hole, add rim
+        col *= mix(1.0, 0.1, coreShadow);
+        col += 0.12 * smoothstep(0.24, 0.245, r);
+
+        // vignette
+        float vig = smoothstep(1.6, 0.2, length(p));
+        col *= vig;
+
+        // intensity
+        col *= u_intensity;
+
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `;
+
+    mesh = new THREE.Mesh(geom, mat);
+    scene.add(mesh);
+
+    // simple smoke system (sprites) to use in the takeoff
+    smokeSys = buildSmokeSystem();
+    scene.add(smokeSys.group);
 
     window.addEventListener('resize', onResize);
     animate();
-  };
+  }
 
-  // Dali-esque takeoff into the hole (spiral + miniaturise + trail)
-  window.playEntry = function playEntry(next){
-    if (!entryRoot) return next?.();
+  function buildSmokeSystem(){
+    const group = new THREE.Group();
+    const COUNT = 140;
+    const tex = new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/disc.png'); // round sprite
+    const geom = new THREE.BufferGeometry();
+    const positions = new Float32Array(COUNT*3);
+    const sizes = new Float32Array(COUNT);
+    for(let i=0;i<COUNT;i++){
+      positions[i*3+0] = 9999; // start off-canvas
+      positions[i*3+1] = 9999;
+      positions[i*3+2] = 0;
+      sizes[i] = Math.random()*18+10;
+    }
+    geom.setAttribute('position', new THREE.BufferAttribute(positions,3));
+    geom.setAttribute('aSize', new THREE.BufferAttribute(sizes,1));
+    const mat = new THREE.PointsMaterial({ map: tex, color: 0x889099, transparent:true, opacity:0.85, depthWrite:false, size: 16, sizeAttenuation:true });
+    const points = new THREE.Points(geom, mat);
+    group.add(points);
 
-    const tl = gsap.timeline({ defaults:{ ease:"power2.inOut" }});
-
-    // spiral path to the center
-    tl.to(ufo.position, { 
-      duration: 2.0,
-      // spiral: reduce radius while rotating around center
-      onUpdate:function(){
-        const p = this.progress();
-        const angle = p * Math.PI * 4.0;
-        const radius = 8 * (1.0 - p);
-        ufo.position.x = Math.cos(angle)*radius;
-        ufo.position.z = Math.sin(angle)*radius;
-        ufo.position.y = 1.2 + (1.0 - p)*0.6;
+    return {
+      group,
+      emit(x,y){
+        // shift a few particles to the emitter spot
+        const p = geom.attributes.position.array;
+        for(let k=0;k<12;k++){
+          const i = Math.floor(Math.random()*COUNT);
+          p[i*3+0] = x + (Math.random()-0.5)*12;
+          p[i*3+1] = y + (Math.random()-0.5)*10;
+          p[i*3+2] = 0;
+        }
+        geom.attributes.position.needsUpdate = true;
+      },
+      fade(){
+        const p = geom.attributes.position.array;
+        for(let i=0;i<COUNT;i++){
+          // drift outward + fade by lifting “z”
+          p[i*3+0] += (Math.random()-0.5)*0.6;
+          p[i*3+1] += (Math.random()-0.5)*0.4;
+        }
+        geom.attributes.position.needsUpdate = true;
+        points.material.opacity *= 0.994;
       }
-    }, 0);
+    };
+  }
 
-    // shrink & stretch (optical miniaturisation)
-    tl.to(ufo.scale, { x:0.2, y:0.2, z:0.2, duration: 1.6 }, 0.4);
-    tl.to(ufo.scale, { x:0.05, y:0.05, z:0.05, duration: 0.6 }, 1.6);
+  function onResize(){
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    if (mesh && mesh.material.uniforms) {
+      mesh.material.uniforms.u_aspect.value = window.innerWidth/window.innerHeight;
+    }
+  }
 
-    // slight camera dolly for depth parallax
-    tl.to(camera.position, { z: 7.0, duration: 1.6 }, 0.2);
+  function animate(){
+    requestAnimationFrame(animate);
+    if (mesh) mesh.material.uniforms.u_time.value = (performance.now()/1000);
+    if (smokeSys) smokeSys.fade();
+    renderer.render(scene, camera);
+  }
 
-    // finish: fade the whole layer out, then hide, then call next()
-    tl.to(entryRoot, { autoAlpha: 0, duration: 0.6, onComplete: () => {
-      entryRoot.style.display="none";
-      next?.();
-    }}, 2.2);
-  };
+  // Takeoff animation → shrink into black hole → handoff
+  function startJourney(){
+    // figure out where the button is in canvas coords (center of screen)
+    const rect = canvas.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+
+    // make smoke visible
+    smokeSys.group.visible = true;
+
+    const tl = gsap.timeline({
+      defaults:{ ease: "power2.in", duration: 1.2 },
+      onComplete(){
+        // hide entry, boot solar system
+        gsap.to(entry, { autoAlpha: 0, duration: 0.5, onComplete: () => {
+          entry.style.display = 'none';
+          if (window.initSolarSystem) window.initSolarSystem();
+          if (window.startWelcomeSequence) window.startWelcomeSequence(); // overview → focus first planet
+        }});
+      }
+    });
+
+    // spiral path into the hole (center screen), scale down
+    tl.to('#alien-start', {
+      motionPath: {
+        path: [
+          { x:  0, y:  0 },
+          { x: -40, y: -20 },
+          { x:  60, y:  30 },
+          { x:  0, y:   0 }
+        ],
+        curviness: 2
+      },
+      rotate: 360,
+      duration: 0.9,
+      ease: "power2.inOut",
+      onUpdate(){
+        const b = startBtn.getBoundingClientRect();
+        const x = b.left + b.width/2;
+        const y = b.top + b.height/2;
+        smokeSys.emit(x, y);
+      }
+    })
+    .to('#alien-start', {
+      scale: 0.06,
+      duration: 0.9,
+      ease: "power3.in",
+      onUpdate(){
+        const b = startBtn.getBoundingClientRect();
+        const x = b.left + b.width/2;
+        const y = b.top + b.height/2;
+        smokeSys.emit(x, y);
+        if (mesh) mesh.material.uniforms.u_intensity.value = 1.2; // brighten a touch
+      }
+    }, "-=0.4");
+  }
+
+  // INIT
+  initWormhole();
+
+  // Button triggers the takeoff
+  startBtn.addEventListener('click', startJourney);
 })();
